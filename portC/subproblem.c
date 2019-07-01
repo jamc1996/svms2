@@ -77,7 +77,10 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
     mu = newRSQ/rSq;
     linearOp2(sp->rho, sp->gamma, mu, sp->p);
     rSq = newRSQ;
+    for (int i = 0; i < sp->p; i++) {
+      printf("ap[%d] is %lf\n",i,sp->alphaHat[i] );
 
+    }
     i++;
   }
 

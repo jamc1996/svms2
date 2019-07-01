@@ -79,10 +79,12 @@ void updateAlphaR(struct Fullproblem *fp, struct Projected *sp)
 {
   // Use rho as temporary place to store P*alpha:
   for (int i = 0; i < sp->p; i++) {
+    printf("alphaHat = %lf\n",sp->alphaHat[i] );
     sp->rho[i] = sp->alphaHat[i];
     for (int j = 0; j < sp->p; j++) {
       sp->rho[i] -= ((sp->yHat[i]*sp->yHat[j])/((double)(sp->p)))*sp->alphaHat[j];
     }
+    printf("rho[%d] = %lf\n",i,sp->rho[i] );
   }
 
   // Alpha of each active point is updated:
@@ -200,7 +202,6 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
     for (int i = 0; i < fp->p; i++) {
       printf("fp->alpha[i] = %lf\n",fp->alpha[i]);
     }
-    exit(1);
     return n - fp->p;
   }
 
@@ -210,7 +211,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
   if (change < 0)
   {
     if (ds->y[fp->inactive[worst]] == target) {
-      adjustGradF(fp, ds, n, worst, change, 1);
+      adjustGradF(fp, ds, sp, n, worst, change, 1);
       fp->alpha[fp->inactive[worst]] -= fp->alpha[ fp->active[n] ];
       fp->alpha[fp->active[n]] = 0.0;//sp->C ;
       fp->active[n] = fp->inactive[worst];
@@ -218,7 +219,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
       fp->beta[worst] = DBL_MAX-1.0;
     }
     else {
-      adjustGradF(fp, ds, n, worst, change, 0);
+      adjustGradF(fp, ds, sp, n, worst, change, 0);
       fp->alpha[fp->inactive[worst]] += fp->alpha[fp->active[n]];
       fp->alpha[fp->active[n]] = 0.0;//sp->C ;
       fp->active[n] = fp->inactive[worst];
@@ -229,7 +230,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
   else
   {
     if (ds->y[fp->inactive[worst]] == target) {
-      adjustGradF(fp, ds, n, worst, change, 1);
+      adjustGradF(fp, ds, sp, n, worst, change, 1);
       fp->alpha[fp->inactive[worst]] -= sp->C - fp->alpha[fp->active[n]];
       fp->alpha[fp->active[n]] = sp->C;
       fp->active[n] = fp->inactive[worst];
@@ -237,7 +238,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
       fp->beta[worst] = DBL_MAX;
     }
     else{
-      adjustGradF(fp, ds, n, worst, change, 0);
+      adjustGradF(fp, ds, sp, n, worst, change, 0);
       //printf("alpha is %lf  and  target is %d and ina is %lf\n\n\n",fp->alpha[fp->active[n]], target,ds->y[fp->inactive[worst]]);
       fp->alpha[fp->inactive[worst]] += sp->C - fp->alpha[fp->active[n]];
       fp->alpha[fp->active[n]] = sp->C;
@@ -271,55 +272,72 @@ int checkfpConstraints(struct Fullproblem *fp)
   return 0;
 }
 
-void adjustGradF(struct Fullproblem *fp, struct denseData *ds, int n, int worst, int signal, int target)
+void adjustGradF(struct Fullproblem *fp, struct denseData *ds, struct Projected *sp, int n, int worst, int signal, int target)
 {
   printf("n is %d and worst is %d and signal is %d targ %d\n", n, fp->inactive[worst], signal, target);
   // Update based on change of H matrix:
   if (signal == -1) {
+    printf("fp == %lf\n",fp->alpha[n] );
     for (int i = 0; i < fp->q; i++) {
-      fp->gradF[ fp->inactive[i] ] += fp->partialH[i][n]*fp->alpha[n] ;
+      fp->gradF[ fp->inactive[i] ] += fp->partialH[i][n]*fp->alpha[fp->active[n]] ;
+    }
+    for (int i = 0; i < fp->p; i++) {
+      if(i<n){
+        fp->gradF[ fp->active[i] ] += sp->H[i][n]*fp->alpha[fp->active[n]];
+      }
+      else{
+        fp->gradF[ fp->active[i] ] += sp->H[n][i]*fp->alpha[fp->active[n]];
+      }
     }
   }
   else
   {
     for (int i = 0; i < fp->q; i++) {
-      fp->gradF[ fp->inactive[i] ] += fp->partialH[i][n]*(fp->C - fp->alpha[n]) ;
+      fp->gradF[ fp->inactive[i] ] += fp->partialH[i][n]*(fp->alpha[fp->active[n]] - fp->C) ;
+    }
+    for (int i = 0; i < fp->p; i++) {
+      if(i<n){
+        fp->gradF[ fp->active[i] ] += sp->H[i][n]*(fp->alpha[fp->active[n]] - fp->C) ;
+      }
+      else{
+        fp->gradF[ fp->active[i] ] += sp->H[n][i]*(fp->alpha[fp->active[n]] - fp->C) ;
+      }
     }
   }
 
   // Update based on change of
-  double* temp = (double*) malloc(sizeof(double)*fp->q);
+  double* temp = (double*) malloc(sizeof(double)*fp->n);
 
-  for (int j = 0; j < fp->q; j++) {
+  for (int j = 0; j < fp->n; j++) {
     temp[j] = 0.0;
     for (int k = 0; k < ds->nFeatures; k++) {
-      temp[j]+=ds->data[fp->inactive[worst]][k]*ds->data[fp->inactive[j]][k];
+      temp[j]+=ds->data[fp->inactive[worst]][k]*ds->data[j][k];
     }
-    temp[j]*=ds->y[fp->inactive[worst]]*ds->y[fp->inactive[j]];
+    temp[j]*=ds->y[fp->inactive[worst]]*ds->y[j];
   }
 
   if (signal == -1) {
     if (target) {
-      for (int i = 0; i < fp->q; i++) {
-        fp->gradF[fp->inactive[i]] += temp[i]*fp->alpha[n] ;
+      for (int i = 0; i < fp->n; i++) {
+        fp->gradF[i] += temp[i]*fp->alpha[fp->active[n]] ;
       }
     }
     else{
-      for (int i = 0; i < fp->q; i++) {
-        fp->gradF[fp->inactive[i]] -= temp[i]*fp->alpha[n] ;
+      for (int i = 0; i < fp->n; i++) {
+        fp->gradF[i] -= temp[i]*fp->alpha[fp->active[n]] ;
       }
     }
   }
   else
   {
     if (target) {
-      for (int i = 0; i < fp->q; i++) {
-        fp->gradF[fp->inactive[i]] -= temp[i]*(fp->C - fp->alpha[n]) ;
+      for (int i = 0; i < fp->n; i++) {
+        fp->gradF[i] += temp[i]*(fp->C - fp->alpha[fp->active[n]]) ;
       }
     }
     else{
-      for (int i = 0; i < fp->q; i++) {
-        fp->gradF[fp->inactive[i]] -= temp[i]*(fp->C - fp->alpha[n]) ;
+      for (int i = 0; i < fp->n; i++) {
+        fp->gradF[i] -= temp[i]*(fp->C - fp->alpha[fp->active[n]]) ;
       }
     }
   }

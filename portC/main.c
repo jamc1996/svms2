@@ -54,6 +54,7 @@ int main(int argc, char *argv[]) {
       b -= sp.H[0][i]*fp.alpha[fp.active[i]];
     }
     for (int i = 0; i < fp.p; i++) {
+      w[i] = 0.0;
       for (int j = 0; j < fp.p; j++) {
         w[i] += fp.alpha[fp.active[j]]*ds.data[fp.active[j]][i]*ds.y[fp.active[j]];
       }
@@ -61,11 +62,11 @@ int main(int argc, char *argv[]) {
     }
     printf("b = %lf\n",b );
     for (int i = 0; i < fp.n; i++) {
-      double x = b;
+      double res = b;
       for (int j = 0; j < fp.p; j++) {
-        x+= w[j]*ds.data[i][j];
+        res += w[j]*ds.data[i][j];
       }
-      printf("res[%d] = %lf\n",i,x );
+      printf("res[%d] = %lf\n",i,res );
     }
     return 0;
   }
@@ -82,36 +83,38 @@ int main(int argc, char *argv[]) {
 
   // We loop until no negative entries in beta:
   int k = 1;
-  int max_iters = 30;
+  int max_iters = 7;
   int itt = 0;
   int n = 0;
 
   while(k){
     // H matrix columns re-set and subproblem changed
     for (int i = 0; i < sp.p; i++) {
-      printf("active[%d] = %d, alpha[] = %lf\n",i,fp.active[i],fp.alpha[fp.active[i]] );
+      printf("Before: active[%d] = %d, alpha[] = %lf\n",i,fp.active[i],fp.alpha[fp.active[i]] );
     }
     setH(&fp, &ds);
-
     init_subprob(&sp, &fp, &ds);
 
     //  congjugate gradient algorithm
     //  n = 0 if algorithm completes
     //  n != 0 if algorithm interrupt
-    printf("\n\n\n\n" );
-
     n = cg(&sp, &fp);
 
     updateAlphaR(&fp, &sp);
     calcYTR(&sp, &fp);
+    printf("%lf\n",sp.ytr );
     calculateBeta(&fp, &sp, &ds);
-
-
+    for (int i = 0; i < sp.p; i++) {
+      printf("After: active[%d] = %d, alpha[] = %lf\n",i,fp.active[i],fp.alpha[fp.active[i]] );
+    }
+    for (int i = 0; i < fp.q; i++) {
+      if (fp.beta[i] < 0.0) {
+        printf("beta[%d] = %lf\n",fp.inactive[i],fp.beta[i] );
+      }
+    }
     if (n==0) {
       printf("Converged!\n" );
-      for (int i = 0; i < fp.q; i++) {
-      printf("beta[%d](%d) = % lf\n",i,fp.inactive[i],fp.beta[i] );
-      }
+
       int add = 2;
       int *temp = malloc(sizeof(int)*add);
       int *temp2 = malloc(sizeof(int)*add);
@@ -119,25 +122,11 @@ int main(int argc, char *argv[]) {
       if (add == 0){
         break;
       }
-      for (int i = 0; i < fp.p; i++) {
-        printf("active[%d] = %d\n",i, fp.active[i] );
-      }
-      printf("\n" );
-      for (int i = 0; i < fp.q; i++) {
-        printf("inactive[%d] = %d\n",i, fp.inactive[i] );
-      }
       changeP(&fp, &sp, add);
       reinitprob(&fp, &sp, add, temp, temp2);
-      for (int i = 0; i < fp.p; i++) {
-        printf("active[%d] = %d\n",i, fp.active[i] );
-      }
-      printf("\n" );
-      for (int i = 0; i < fp.q; i++) {
-        printf("inactive[%d] = %d\n",i, fp.inactive[i] );
-      }
+
       free(temp);
       free(temp2);
-      //break;
     }
     int prqe = 0;
 
@@ -147,12 +136,7 @@ int main(int argc, char *argv[]) {
       for (int i = 0; i < sp.p; i++) {
         printf("active[%d] = %d, alpha[] = %lf\n",i,fp.active[i],fp.alpha[fp.active[i]] );
       }
-      for (int i = 0; i < fp.q; i++) {
-        if (fp.beta[i] < 0.0) {
-          printf("beta[%d] = %lf\n",fp.inactive[i],fp.beta[i] );
 
-        }
-      }
       k = singleswap(&ds, &fp, &sp, n);
       if (k < 0) {
         printf("shrinking\n" );
@@ -164,12 +148,10 @@ int main(int argc, char *argv[]) {
       if (prqe == fp.n) {
         return 1;
       }
-      printf("n is %d and alpha is %lf\n",n,fp.alpha[fp.active[0]]);
     }
 
-    printf("active is %d %d %d %d\n",fp.active[0],fp.active[1],fp.active[2],fp.active[3] );
-
     itt++;
+    printf("%d\n",itt );
     if(itt == max_iters){
       break;
     }
@@ -214,31 +196,18 @@ void shrinkSize( struct Fullproblem *fp, struct Projected *sp, int k)
     fp->partialH[i] = &fp->h[i*fp->p];
   }
 
-  printf("reallocing\n" );
-
   sp->p--;
 
   sp->alphaHat = realloc(sp->alphaHat,sizeof(double)*sp->p);
-  printf("reallocing\n" );
   sp->yHat = realloc(sp->yHat,sizeof(double)*sp->p);
-
-  sp->yHat = realloc(sp->yHat,sizeof(double)*sp->p);
-  printf("reallocing\n" );
-
   sp->rHat = realloc(sp->rHat,sizeof(double)*sp->p);
-
-  printf("reallocing\n" );
 
   sp->gamma = realloc(sp->gamma,sizeof(double)*sp->p);
   sp->rho = realloc(sp->rho,sizeof(double)*sp->p);
   sp->Hrho = realloc(sp->Hrho,sizeof(double)*sp->p);
 
-  printf("reallocing\n" );
-
   sp->H = realloc(sp->H,sizeof(double*)*sp->p);
   sp->h = realloc(sp->h,sizeof(double)*((sp->p*(sp->p+1))/2));
-
-  printf("reallocing\n" );
 
   int j = 0;
   for (int i = 0; i < sp->p; i++) {
@@ -249,45 +218,27 @@ void shrinkSize( struct Fullproblem *fp, struct Projected *sp, int k)
 
 void changeP( struct Fullproblem *fp, struct Projected *sp, int add)
 {
-  printf("p is %d and q is %d\n",fp->p, fp->q );
   fp->p += add;
   fp->q -= add;
-  printf("p is %d and q is %d\n",fp->p, fp->q );
+  sp->p += add;
+
   fp->active = realloc(fp->active,sizeof(int)*fp->p);
   fp->inactive = realloc(fp->inactive,sizeof(int)*fp->q);
   fp->beta = realloc(fp->beta,sizeof(double)*fp->q);
-
   fp->h = realloc(fp->h,sizeof(double)*fp->q*fp->p);
   fp->partialH = realloc(fp->partialH,sizeof(double*)*fp->q);
   for (int i = 0; i < fp->q; i++) {
     fp->partialH[i] = &fp->h[i*fp->p];
   }
 
-  printf("reallocing\n" );
-
-  sp->p += add;
-
   sp->alphaHat = realloc(sp->alphaHat,sizeof(double)*sp->p);
-  printf("reallocing\n" );
   sp->yHat = realloc(sp->yHat,sizeof(double)*sp->p);
-
-  sp->yHat = realloc(sp->yHat,sizeof(double)*sp->p);
-  printf("reallocing\n" );
-
   sp->rHat = realloc(sp->rHat,sizeof(double)*sp->p);
-
-  printf("reallocing\n" );
-
   sp->gamma = realloc(sp->gamma,sizeof(double)*sp->p);
   sp->rho = realloc(sp->rho,sizeof(double)*sp->p);
   sp->Hrho = realloc(sp->Hrho,sizeof(double)*sp->p);
-
-  printf("reallocing\n" );
-
   sp->H = realloc(sp->H,sizeof(double*)*sp->p);
   sp->h = realloc(sp->h,sizeof(double)*((sp->p*(sp->p+1))/2));
-
-  printf("reallocing\n" );
 
   int j = 0;
   for (int i = 0; i < sp->p; i++) {
@@ -305,7 +256,7 @@ int findWorstest(struct Fullproblem *fp , int add, int* temp, int* temp2)
   }
   for (int i = 0; i < fp->q; i++)
   {
-    for (int j = 0; j < fp->p; j++)
+    for (int j = 0; j < add; j++)
     {
       if (fp->beta[i]<betaVal[j])
       {
@@ -326,9 +277,6 @@ int findWorstest(struct Fullproblem *fp , int add, int* temp, int* temp2)
       return i;
     }
   }
-
-  printf("temp1 is %d and %d\n", temp[0],temp[1]);
-  printf("temp2 is %d and %d\n", temp2[0],temp2[1]);
 
   return add;
 }
