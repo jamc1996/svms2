@@ -59,6 +59,6 @@ struct Fullproblem{
 
 	double** partialH;
 	double* h;
-};
+} fullprob;
 
 #endif

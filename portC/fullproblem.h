@@ -16,5 +16,6 @@ void setH(struct Fullproblem *prob, struct denseData *ds);
 int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *sp, int n);
 void adjustGradF(struct Fullproblem *fp, struct denseData *ds, int n, int worst, int signal, int target);
 int checkfpConstraints(struct Fullproblem *fp);
+void findWorst(int *worst, int* target, int* change, int *n, struct denseData *ds, struct Fullproblem *fp);
 
 #endif

@@ -65,6 +65,7 @@ void setH(struct Fullproblem *prob, struct denseData *ds)
 {
   for (int i = 0; i < prob->q; i++) {
     for (int j = 0; j < prob->p; j++) {
+      printf("%d and %d\n",i,j );
       prob->partialH[i][j] = 0.0;
       for (int k = 0; k < ds->nFeatures; k++) {
         prob->partialH[i][j] += ds->data[prob->inactive[i]][k]*ds->data[prob->active[j]][k];
@@ -80,9 +81,13 @@ void updateAlphaR(struct Fullproblem *fp, struct Projected *sp)
   // Use rho as temporary place to store P*alpha:
   for (int i = 0; i < sp->p; i++) {
     sp->rho[i] = sp->alphaHat[i];
+    printf("rho[%d] is %lf\n",i,sp->rho[i] );
+    printf("yhat is %lf\n",sp->yHat[i] );
     for (int j = 0; j < sp->p; j++) {
-      sp->rho[i] -= ((sp->yHat[i]*sp->yHat[j])/((double)(sp->p)))*sp->alphaHat[i];
+      sp->rho[i] -= ((sp->yHat[i]*sp->yHat[j])/((double)(sp->p)))*sp->alphaHat[j];
+      printf("rho[%d] is %lf\n",i,sp->rho[i] );
     }
+    printf("rho[%d] is %lf\n\n",i,sp->rho[i] );
   }
 
   // Alpha of each active point is updated:
@@ -112,7 +117,49 @@ void calculateBeta(struct Fullproblem *fp, struct Projected *sp, struct denseDat
 /* Function to calculate the beta vector - tracks how suboptimal the values for*/
 {
   for (int i = 0; i < fp->q; i++) {
-    fp->beta[i] = fp->gradF[fp->inactive[i]] ;
+    if (fp->alpha[fp->inactive[i]] < 0.0000000001) {
+      fp->beta[i] =  -fp->gradF[fp->inactive[i]] + ds->y[fp->inactive[i]]*sp->ytr/((double)sp->p);
+    }
+    else if (fp->alpha[fp->inactive[i]] >= sp->C - 0.001) {
+      fp->beta[i] =  fp->gradF[fp->inactive[i]] - ds->y[fp->inactive[i]]*sp->ytr/((double)sp->p);
+    }
+  }
+}
+
+void findWorst(int *worst, int* target, int* change, int *n, struct denseData *ds, struct Fullproblem *fp)
+{
+  double tester = DBL_MAX;
+
+  if (*n > 0) {
+    (*change) = 1;
+    *n -= fp->p;
+  }
+  else {
+    (*change) = -1;
+    *n+=fp->p;
+  }
+  *target = ds->y[fp->active[*n]]*(*change);
+
+  for (int i = 0; i < fp->q; i++) {
+    if( ds->y[fp->inactive[i]] == *target )  {
+      if (fp->beta[i] < tester) {
+        if (fp->alpha[fp->inactive[i]] < fp->C){
+          *worst = i;
+          tester = fp->beta[i];
+        }
+      }
+    }
+    if( ds->y[fp->inactive[i]] != *target )  {
+      if (fp->beta[i] < tester) {
+        if (fp->alpha[fp->inactive[i]] > 0.0){
+          *worst = i;
+          tester = fp->beta[i];
+        }
+      }
+    }
+  }
+  if (tester > 0.0) {
+    *worst = -1;
   }
 }
 
@@ -120,50 +167,34 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
 {
   int worst = -1;
   int target, change=1;
-  double tester = DBL_MAX;
 
-  if (n > 0) {
-    change = 1;
-    n-=sp->p;
-  }
-  else {
-    change = -1;
-    n+=sp->p;
-  }
-  target = ds->y[fp->active[n]]*change;
 
-  target = change*ds->y[fp->active[n]];
+  findWorst(&worst,&target,&change,&n, ds, fp);
 
-  for (int i = 0; i < fp->q; i++) {
-    if( ds->y[fp->inactive[i]] == target )  {
-      if (fp->beta[i]<tester) {
-        printf("inactive is %d\n",fp->inactive[i]);
-        printf("alpha is %lf\n",fp->alpha[fp->inactive[i]]);
-        if (fp->alpha[fp->inactive[i]] < sp->C){
-          worst = i;
-          tester = fp->beta[i];
-        }
-      }
-    }
-    if( ds->y[fp->inactive[i]] != target )  {
-      if (fp->beta[i]<tester) {
-        printf("inactive is %d\n",fp->inactive[i]);
-        printf("alpha is %lf\n",fp->alpha[fp->inactive[i]]);
-        if (fp->alpha[fp->inactive[i]] > 0.0){
-          worst = i;
-          tester = fp->beta[i];
-        }
-      }
-    }
-  }
   printf("worst is %d\n",worst );
-  if (worst < 0) {
-    for (int i = 0; i < fp->q; i++) {
-      if( fp->alpha[fp->inactive[i]] > 0 && fp->alpha[fp->inactive[i]] <sp->C )  {
-        worst = i;
+  double diff;
+  if (change<0) {
+    diff = fp->alpha[fp->active[n]];
+  }
+  else{
+    diff = fp->C - fp->alpha[fp->active[n]];
+  }
+
+  if(worst < 0)
+  {
+    for (int i = 0; i < sp->p; i++) {
+      if (i != n) {
+        if (ds->y[fp->active[i]] == target){
+          fp->alpha[fp->active[i]] += diff/(double)(fp->p-1);
+        }
+        else{
+          fp->alpha[fp->active[i]] -= diff/(double)(fp->p-1);
+        }
       }
     }
+    return 1;
   }
+
 
   int temp = fp->active[n];
 
@@ -171,43 +202,39 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
   {
     if (ds->y[fp->inactive[worst]] == target) {
       adjustGradF(fp, ds, n, worst, change, 1);
-      printf("alpha is %lf and %d  and  target is %d and ina is %lf\n\n\n",fp->alpha[fp->active[n]],fp->active[n], target,ds->y[fp->inactive[worst]]);
       fp->alpha[fp->inactive[worst]] -= fp->alpha[ fp->active[n] ];
       fp->alpha[fp->active[n]] = 0.0;//sp->C ;
       fp->active[n] = fp->inactive[worst];
       fp->inactive[worst] = temp;
-      fp->beta[worst] = fp->C;
+      fp->beta[worst] = DBL_MAX-1.0;
     }
     else {
       adjustGradF(fp, ds, n, worst, change, 0);
-      printf("alpha is %lf  and  target is %d and ina is %lf\n\n\n",fp->alpha[fp->active[n]], target,ds->y[fp->inactive[worst]]);
       fp->alpha[fp->inactive[worst]] += fp->alpha[fp->active[n]];
       fp->alpha[fp->active[n]] = 0.0;//sp->C ;
       fp->active[n] = fp->inactive[worst];
       fp->inactive[worst] = temp;
-      fp->beta[worst] = fp->C;
+      fp->beta[worst] = DBL_MAX;
     }
-
   }
   else
   {
     if (ds->y[fp->inactive[worst]] == target) {
       adjustGradF(fp, ds, n, worst, change, 1);
-      printf("alpha is %lf  and  target is %d and ina is %lf\n\n\n",fp->alpha[fp->active[n]], target,ds->y[fp->inactive[worst]]);
       fp->alpha[fp->inactive[worst]] += sp->C - fp->alpha[fp->active[n]];
       fp->alpha[fp->active[n]] = sp->C;
       fp->active[n] = fp->inactive[worst];
       fp->inactive[worst] = temp;
-      fp->beta[worst] = fp->C;
+      fp->beta[worst] = DBL_MAX;
     }
     else{
       adjustGradF(fp, ds, n, worst, change, 0);
-      printf("alpha is %lf  and  target is %d and ina is %lf\n\n\n",fp->alpha[fp->active[n]], target,ds->y[fp->inactive[worst]]);
+      //printf("alpha is %lf  and  target is %d and ina is %lf\n\n\n",fp->alpha[fp->active[n]], target,ds->y[fp->inactive[worst]]);
       fp->alpha[fp->inactive[worst]] -= sp->C - fp->alpha[fp->active[n]];
       fp->alpha[fp->active[n]] = sp->C;
       fp->active[n] = fp->inactive[worst];
       fp->inactive[worst] = temp;
-      fp->beta[worst] = fp->C;
+      fp->beta[worst] = DBL_MAX;
     }
   }
 
@@ -220,14 +247,15 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
 
 int checkfpConstraints(struct Fullproblem *fp)
 {
+  printf("\n" );
   for (int i = 0; i < fp->p; i++) {
     printf("alpha is %lf for %d\n",fp->alpha[fp->active[i]],fp->active[i] );
     if(fp->alpha[fp->active[i]]>fp->C){
-      printf("greater than C fp[%d]-> = %lf \n",fp->active[i],fp->alpha[fp->active[i]] );
+      //printf("greater than C fp[%d]-> = %lf \n",fp->active[i],fp->alpha[fp->active[i]] );
       return i+fp->p;
     }
     else if(fp->alpha[fp->active[i]] < 0.0){
-      printf("less than 0 fp[%d]-> = %lf \n",fp->active[i],fp->alpha[fp->active[i]] );
+      //printf("less than 0 fp[%d]-> = %lf \n",fp->active[i],fp->alpha[fp->active[i]] );
       return i-fp->p;
     }
   }
@@ -236,6 +264,7 @@ int checkfpConstraints(struct Fullproblem *fp)
 
 void adjustGradF(struct Fullproblem *fp, struct denseData *ds, int n, int worst, int signal, int target)
 {
+  printf("n is %d and worst is %d and signal is %d targ %d\n", n, worst, signal, target);
   // Update based on change of H matrix:
   if (signal == -1) {
     for (int i = 0; i < fp->q; i++) {
@@ -331,9 +360,9 @@ int swapMostNegative(struct Fullproblem *fp)
   }
 
 
-  free(location);
-  free(index);
-  free(betaVal);
+  free( location );
+  free( index );
+  free( betaVal );
 
   return 1;
 }

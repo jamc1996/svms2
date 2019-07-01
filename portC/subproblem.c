@@ -6,9 +6,9 @@ void alloc_subprob(struct Projected *sp, int p, struct Fullproblem *fp, struct d
   sp->p = p;
   sp->C = 1000.0;
 
-  sp->alphaHat = (double*)malloc(sizeof(double)*p);
-  sp->yHat = (double*)malloc(sizeof(double)*p);
-  sp->rHat = (double*)malloc(sizeof(double)*p);
+  sp->alphaHat = malloc(sizeof(double)*p);
+  sp->yHat = malloc(sizeof(double)*p);
+  sp->rHat = malloc(sizeof(double)*p);
 
   sp->gamma = (double*)malloc(sizeof(double)*p);
   sp->rho = (double*)malloc(sizeof(double)*p);
@@ -63,7 +63,10 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
 
     problem = checkConstraints(sp, fp);
     if(problem){
-      //linearOp(sp->alphaHat, sp->rho, -lambda, sp->p);
+      if (problem > sp->p || problem < -sp->p) {
+        linearOp(sp->alphaHat, sp->rho, -lambda, sp->p);
+        return problem;
+      }
       return problem;
     }
 
@@ -147,10 +150,18 @@ int checkConstraints(struct Projected* sp, struct Fullproblem *fp)
 
   for (int i = 0; i < sp->p; i++) {
     if(temp[i]>sp->C){
+      if (temp[i]>sp->C*2) {
+        //free(temp);
+        //return i+(2*sp->p);
+      }
       free(temp);
       return i+sp->p;
     }
     else if(temp[i]<0.0){
+      if (temp[i]<sp->C) {
+        //free(temp);
+        //return i+(2*sp->p);
+      }
       free(temp);
       return i-sp->p;
     }
