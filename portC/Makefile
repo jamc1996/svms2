@@ -2,12 +2,12 @@ CPC = g++
 CC = gcc
 
 CPFLAGS = -Wall -std=c++11
-CFLAGS = -Wall
+CFLAGS = -Wall -std=c99
 
 objects = main.o io.o fullproblem.o subproblem.o
 
 gert: $(objects)
-	$(CC) $(CFLAGS) -o gert $(objects)
+	$(CC) $(CFLAGS) -o gert $(objects) -lm
 
 main.o: main.c svm.h
 	$(CC) $(CFLAGS) -c $<
