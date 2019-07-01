@@ -10,12 +10,12 @@ void alloc_subprob(struct Projected *sp, int p, struct Fullproblem *fp, struct d
   sp->yHat = malloc(sizeof(double)*p);
   sp->rHat = malloc(sizeof(double)*p);
 
-  sp->gamma = (double*)malloc(sizeof(double)*p);
-  sp->rho = (double*)malloc(sizeof(double)*p);
-  sp->Hrho = (double*)malloc(sizeof(double)*p);
+  sp->gamma = malloc(sizeof(double)*p);
+  sp->rho = malloc(sizeof(double)*p);
+  sp->Hrho = malloc(sizeof(double)*p);
 
-  sp->H = (double**)malloc(sizeof(double*)*p);
-  sp->h = (double*)malloc(sizeof(double)*((p*(p+1))/2));
+  sp->H = malloc(sizeof(double*)*p);
+  sp->h = malloc(sizeof(double)*((p*(p+1))/2));
 
   int j = 0;
   for (int i = 0; i < p; i++) {
