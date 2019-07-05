@@ -25,21 +25,21 @@ struct denseData{
 };
 
 struct Projected{
+	// Re-inited each time:
 	double* alphaHat;
 	double* yHat;
 	double* rHat;
 	double** H;
 
+	// Will be set during CG iterations
 	double* gamma;
 	double* rho;
 	double* Hrho;
 
+	// Changed independent (p size, ytr calc) or unchanging
 	int p;
 	double C;
-
 	double* h;
-
-
 	double ytr;
 };
 

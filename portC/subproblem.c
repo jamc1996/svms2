@@ -26,7 +26,12 @@ void alloc_subprob(struct Projected *sp, int p, struct Fullproblem *fp, struct d
 
 void init_subprob(struct Projected *sp, struct Fullproblem *fp, struct denseData *ds)
 /* Function to initialize the values of the subproblem struct, given information
- * in a dataset and fp struct with active/inactive vectors initialized. */
+ * in a dataset and fp struct with active/inactive vectors initialized.
+
+ *  Required: Everything allocated, active and inactive correct.
+ *
+
+ */
 {
   for (int i = 0; i < sp->p; i++) {
     sp->yHat[i] = ds->y[fp->active[i]];
@@ -41,9 +46,14 @@ void init_subprob(struct Projected *sp, struct Fullproblem *fp, struct denseData
       for (int k = 0; k < ds->nFeatures; k++) {
         sp->H[i][j] += ds->data[fp->active[i]][k]*ds->data[fp->active[j]][k];
       }
-      sp->H[i][j]*=ds->y[fp->active[i]]*ds->y[fp->active[j]];
+      sp->H[i][j] *= ds->y[ fp->active[i] ] * ds->y[ fp->active[j] ];
     }
   }
+}
+
+int cgSLS(struct Projected *sp, struct Fullproblem *fp)
+{
+
 }
 
 int cg(struct Projected *sp, struct Fullproblem *fp)
@@ -56,15 +66,18 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
   int problem = 0;
   int i=0;
   int flag = 1;
-  while (rSq > 0.001 && i<10) {
+  while (rSq > 0.00000000001 && i<10) {
     calc_Hrho(sp);
+    if (inner_prod(sp->Hrho, sp->rho, sp->p) < 0.0000001) {
+      printf("Yeah screw it\n" );
+    }
     lambda = rSq/inner_prod(sp->Hrho, sp->rho, sp->p);
     linearOp(sp->alphaHat, sp->rho, lambda, sp->p);
 
     problem = checkConstraints(sp, fp);
     if(problem){
       if (problem > sp->p || problem < -sp->p) {
-        linearOp(sp->alphaHat, sp->rho, -lambda, sp->p);
+        //linearOp(sp->alphaHat, sp->rho, -lambda, sp->p);
         return problem;
       }
       return problem;
@@ -77,10 +90,6 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
     mu = newRSQ/rSq;
     linearOp2(sp->rho, sp->gamma, mu, sp->p);
     rSq = newRSQ;
-    for (int i = 0; i < sp->p; i++) {
-      printf("ap[%d] is %lf\n",i,sp->alphaHat[i] );
-
-    }
     i++;
   }
 
@@ -93,6 +102,7 @@ void calcYTR(struct Projected *sp, struct Fullproblem *fp)
   sp->ytr = 0.0;
   for (int i = 0; i < sp->p; i++) {
     sp->ytr += sp->yHat[i]*fp->gradF[fp->active[i]];
+    printf("ytr is now %lf\n",sp->ytr );
   }
 }
 

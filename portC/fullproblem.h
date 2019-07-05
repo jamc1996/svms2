@@ -17,5 +17,5 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
 void adjustGradF(struct Fullproblem *fp, struct denseData *ds, struct Projected *sp, int n, int worst, int signal, int target);
 int checkfpConstraints(struct Fullproblem *fp);
 void findWorst(int *worst, int* target, int* change, int *n, struct denseData *ds, struct Fullproblem *fp);
-
+void spreadChange(struct denseData *ds, struct Fullproblem *fp, struct Projected *sp, int target, double diff, int change, int n);
 #endif

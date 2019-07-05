@@ -12,7 +12,28 @@ void changeP( struct Fullproblem *fp, struct Projected *sp, int add);
 int findWorstest(struct Fullproblem *fp , int add, int* temp, int* temp2);
 void reinitprob( struct Fullproblem *fp, struct Projected *sp, int add, int* temp, int* temp2);
 void shrinkSize( struct Fullproblem *fp, struct Projected *sp, int k);
-
+void cleanData( struct denseData *ds){
+  for (int i = 0; i < ds->nInstances - 1; i++) {
+    printf("%d\n",i );
+    for (int j = i; j < ds->nInstances; j++) {
+      int flag = 1;
+      double check;
+      double previous = ds->data[i][0]/ds->data[j][0];
+      for (int k = 1; k < ds->nFeatures; k++) {
+        check = ds->data[i][k]/ds->data[j][k];
+        printf("%lf and %lf\n",previous,check );
+        if (fabs(check - previous) > 0.0001 ) {
+          flag = 0;
+          break;
+        }
+        previous = check;
+      }
+      if (flag == 1) {
+        printf("%d is broken\n",j );
+      }
+    }
+  }
+}
 int main(int argc, char *argv[]) {
   char* filename = NULL;
   struct svm_args parameters;
@@ -25,35 +46,56 @@ int main(int argc, char *argv[]) {
   read_file(filename, &ds);
   preprocess(&ds);
 
+  double* bigH = malloc(sizeof(double)*ds.nInstances*ds.nInstances);
+  double** fullBigH = malloc(sizeof(double*)*ds.nInstances);
+  for (int i = 0; i < ds.nInstances; i++) {
+    fullBigH[i] = &bigH[i*ds.nInstances];
+    for (int j = 0; j < ds.nInstances; j++) {
+      fullBigH[i][j] = 0.0;
+      for (int k = 0; k < ds.nFeatures; k++) {
+        fullBigH[i][j] += ds.data[i][k]*ds.data[j][k];
+      }
+      fullBigH[i][j] *= ds.y[j]*ds.y[i];
+    }
+  }
+  double* check = malloc(sizeof(double)*ds.nInstances);
+  //cleanData(&ds);
+
   // Projected problem size chosen temporarily
   int p = 4;
 
   if(parameters.test){
-    p = 6;
+    p = 3;
     alloc_prob(&fp, &ds, p);
     init_prob(&fp, &ds);
     alloc_subprob(&sp, p, &fp, &ds);
+    int j = 0;
+    for (int i = 0; i < fp.n; i++) {
+      if (i != 0 && i != 25 && i != 29) {
+        fp.inactive[j] = i;
+        j++;
+      }
+    }
+    fp.active[0] = 0;
+    fp.active[1] = 25;
+    fp.active[2] = 29;
+    fp.alpha[0] = 1.992153;
+    fp.alpha[25] = 1.640305;
+    fp.alpha[29] = 0.351848;
 
-    fp.active[0] = 1;
-    fp.active[1] = 2;
-    fp.active[2] = 4;
-    fp.active[3] = 25;
-    fp.active[4] = 26;
-    fp.active[5] = 49;
-    fp.alpha[1] = 0.901323;
-    fp.alpha[2] = 6.388480;
-    fp.alpha[4] = 1.058919;
-    fp.alpha[25] = 5.082560;
-    fp.alpha[26] = 1.505382;
-    fp.alpha[49] = 1.770779;
     setH(&fp, &ds);
     init_subprob(&sp, &fp, &ds);
-    double b = ds.y[1];
+    for (int i = 0; i < fp.n; i++) {
+      printf("alpha[%d] = %lf\n",i,fp.alpha[i] );
+    }
+
+    double b = 1.0;
     double w[6] = {0};
     for (int i = 0; i < fp.p; i++) {
       b -= sp.H[0][i]*fp.alpha[fp.active[i]];
     }
-    for (int i = 0; i < fp.p; i++) {
+    b*=ds.y[fp.active[0]];
+    for (int i = 0; i < ds.nFeatures; i++) {
       w[i] = 0.0;
       for (int j = 0; j < fp.p; j++) {
         w[i] += fp.alpha[fp.active[j]]*ds.data[fp.active[j]][i]*ds.y[fp.active[j]];
@@ -63,7 +105,7 @@ int main(int argc, char *argv[]) {
     printf("b = %lf\n",b );
     for (int i = 0; i < fp.n; i++) {
       double res = b;
-      for (int j = 0; j < fp.p; j++) {
+      for (int j = 0; j < ds.nFeatures; j++) {
         res += w[j]*ds.data[i][j];
       }
       printf("res[%d] = %lf\n",i,res );
@@ -83,17 +125,18 @@ int main(int argc, char *argv[]) {
 
   // We loop until no negative entries in beta:
   int k = 1;
-  int max_iters = 7;
+  int max_iters = 40;
   int itt = 0;
   int n = 0;
 
   while(k){
+  //  break;
     // H matrix columns re-set and subproblem changed
-    for (int i = 0; i < sp.p; i++) {
-      printf("Before: active[%d] = %d, alpha[] = %lf\n",i,fp.active[i],fp.alpha[fp.active[i]] );
-    }
+    printf("i = %d\n",itt );
     setH(&fp, &ds);
     init_subprob(&sp, &fp, &ds);
+
+
 
     //  congjugate gradient algorithm
     //  n = 0 if algorithm completes
@@ -101,8 +144,33 @@ int main(int argc, char *argv[]) {
     n = cg(&sp, &fp);
 
     updateAlphaR(&fp, &sp);
+    for (int i = 0; i < fp.n; i++) {
+      check[i] = 1.0;
+      for (int j = 0; j < fp.n; j++) {
+        check[i] -= fullBigH[i][j]*fp.alpha[j];
+      }
+    }
+    for (int i = 0; i < fp.p; i++) {
+      printf("active is %d\n",fp.active[i] );
+    }
+    for (int i = 0; i < fp.q; i++) {
+      printf("INactive is %d\n",fp.inactive[i] );
+    }
+    for (int i = 0; i < fp.n; i++) {
+      printf("%lf\n",fp.gradF[i]-check[i] );
+    }
     calcYTR(&sp, &fp);
-    printf("%lf\n",sp.ytr );
+    printf("total ytr %lf\n",sp.ytr );
+    printf("ytr %lf\n",sp.ytr/(double)(fp.p) );
+    double b = 1.0;
+    for (int i = 0; i < fp.p; i++) {
+      printf("h is %lf and alpha is %lf b i s %lf\n",sp.H[0][i],fp.alpha[fp.active[i]],b );
+      b -= sp.H[0][i]*fp.alpha[fp.active[i]];
+    }
+    printf("gradF is %lf %lf %lf\n",fp.gradF[fp.active[0]],fp.gradF[fp.active[1]],fp.gradF[fp.active[2]] );
+    b*=ds.y[fp.active[0]];
+    printf("b = %lf\n",b );
+  //  exit(0);
     calculateBeta(&fp, &sp, &ds);
     for (int i = 0; i < sp.p; i++) {
       printf("After: active[%d] = %d, alpha[] = %lf\n",i,fp.active[i],fp.alpha[fp.active[i]] );
@@ -114,12 +182,18 @@ int main(int argc, char *argv[]) {
     }
     if (n==0) {
       printf("Converged!\n" );
+      for (int i = 0; i < sp.p; i++) {
+        printf("%lf\n",fp.gradF[fp.active[i]] );
+      }
+      printf("ytr %lf\n",sp.ytr/(double)(fp.p) );
 
       int add = 2;
       int *temp = malloc(sizeof(int)*add);
       int *temp2 = malloc(sizeof(int)*add);
       add = findWorstest(&fp,add,temp,temp2);
+      printf("adding %d\n",add );
       if (add == 0){
+        printf("Add == 0\n" );
         break;
       }
       changeP(&fp, &sp, add);
@@ -132,19 +206,19 @@ int main(int argc, char *argv[]) {
 
     while (n) {
       // While BCs broken
-      printf("p is %d\n",sp.p );
-      for (int i = 0; i < sp.p; i++) {
-        printf("active[%d] = %d, alpha[] = %lf\n",i,fp.active[i],fp.alpha[fp.active[i]] );
-      }
-
       k = singleswap(&ds, &fp, &sp, n);
+      printf("k is %d\n",k );
+      for (int i = 0; i < fp.q; i++) {
+        printf("%lf\n",fp.beta[i] );
+      }
       if (k < 0) {
         printf("shrinking\n" );
-        shrinkSize(&fp, &sp, k+fp.C);
+        shrinkSize(&fp, &sp, k+fp.p);
         break;
       }
       n = checkfpConstraints(&fp);
       prqe++;
+      break;
       if (prqe == fp.n) {
         return 1;
       }
@@ -153,6 +227,7 @@ int main(int argc, char *argv[]) {
     itt++;
     printf("%d\n",itt );
     if(itt == max_iters){
+      printf("Reached max iters!!!!!\n\n\n" );
       break;
     }
   }
@@ -251,15 +326,16 @@ int findWorstest(struct Fullproblem *fp , int add, int* temp, int* temp2)
 {
   double *betaVal = malloc(sizeof(double)*add);
   for (int i = 0; i < add; i++) {
-    temp2[i] = fp->inactive[fp->q - 2 + i];
     betaVal[i] = DBL_MAX;
   }
   for (int i = 0; i < fp->q; i++)
   {
+    printf("beta is %lf\n",fp->beta[i] );
     for (int j = 0; j < add; j++)
     {
-      if (fp->beta[i]<betaVal[j])
+      if (fp->beta[i] < betaVal[j])
       {
+        printf("ok %d %lf\n", i, betaVal[j]);
         for (int k = add - 1; k > j ; k--)
         {
           temp[k] = temp[k-1];
@@ -271,12 +347,28 @@ int findWorstest(struct Fullproblem *fp , int add, int* temp, int* temp2)
       }
     }
   }
+  int flag;
+  for (int i = 0; i < add; i++) {
+    flag = 0;
+    for (int j = 0; j < add; j++) {
+      if (fp->inactive[fp->q - 2 + i] == temp[i]) {
+        flag = 1;
+      }
+    }
+    if (flag == 0) {
+      temp2[i] = fp->inactive[fp->q - 2 + i];
+//      betaVal[i] = DBL_MAX;
+    }
+  }
 
   for (int i = 0; i < add; i++) {
     if (betaVal[i] > 0) {
+      printf("%lf\n",betaVal[i] );
       return i;
     }
   }
+  printf("temp are %d and %d\n",temp[0],temp[1] );
+  printf("temp2 are %d and %d\n",temp2[0],temp2[1] );
 
   return add;
 }
