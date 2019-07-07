@@ -282,7 +282,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
   if (flag)
   {
     if (ds->y[fp->inactive[worst]] == target) {
-      adjustGradF(fp, ds, sp, n, worst, change, 1);
+      adjustGradF(fp, ds, sp, n, worst, change, 1, flag);
       fp->alpha[fp->inactive[worst]] += diff*change;
       fp->alpha[fp->active[n]] = sp->C;
       fp->active[n] = fp->inactive[worst];
@@ -290,7 +290,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
       fp->beta[worst] = DBL_MAX;
     }
     else{
-      adjustGradF(fp, ds, sp, n, worst, change, 0);
+      adjustGradF(fp, ds, sp, n, worst, change, 0, flag);
       //printf("alpha is %lf  and  target is %d and ina is %lf\n\n\n",fp->alpha[fp->active[n]], target,ds->y[fp->inactive[worst]]);
       fp->alpha[fp->inactive[worst]] += sp->C - fp->alpha[fp->active[n]];
       fp->alpha[fp->active[n]] = sp->C;
@@ -302,7 +302,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
   else
   {
     if (ds->y[fp->inactive[worst]] == target) {
-      adjustGradF(fp, ds, sp, n, worst, change, 1);
+      adjustGradF(fp, ds, sp, n, worst, change, 1, flag);
       fp->alpha[fp->inactive[worst]] -= fp->alpha[ fp->active[n] ];
       fp->alpha[fp->active[n]] = 0.0;//sp->C ;
       fp->active[n] = fp->inactive[worst];
@@ -310,7 +310,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
       fp->beta[worst] = DBL_MAX-1.0;
     }
     else {
-      adjustGradF(fp, ds, sp, n, worst, change, 0);
+      adjustGradF(fp, ds, sp, n, worst, change, 0, flag);
       fp->alpha[fp->inactive[worst]] += fp->alpha[fp->active[n]];
       fp->alpha[fp->active[n]] = 0.0;//sp->C ;
       fp->active[n] = fp->inactive[worst];
@@ -339,7 +339,7 @@ int checkfpConstraints(struct Fullproblem *fp)
   return 0;
 }
 
-void adjustGradF(struct Fullproblem *fp, struct denseData *ds, struct Projected *sp, int n, int worst, int signal, int target)
+void adjustGradF(struct Fullproblem *fp, struct denseData *ds, struct Projected *sp, int n, int worst, int signal, int target, int flag)
 {
   // Update based on change of H matrix:
   if (signal == -1) {
