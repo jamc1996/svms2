@@ -46,7 +46,7 @@ void init_prob(struct Fullproblem *prob, struct denseData *ds)
       prob->inactive[ds->nPos-(prob->p)+i] = ds->nPos + i;
     }
     //fprintf(stderr, "fullproblem.cpp: init_prob(): Not yet working for odd\n");
-    //exit(1);
+    //(1);
   }
   else{
     for (int i = prob->p/2; i < ds->nPos; i++) {
@@ -106,12 +106,12 @@ void updateAlphaR(struct Fullproblem *fp, struct Projected *sp)
       fp->gradF[fp->active[i]] -= sp->H[j][i]*sp->rho[j];
     }
     if (i== 0) {
-      printf("gradF[0] = %lf\n",fp->gradF[0] );
+      //printf("gradF[0] = %lf\n",fp->gradF[0] );
     }
     for (int j = i; j < fp->p; j++) {
       fp->gradF[fp->active[i]] -= sp->H[i][j]*sp->rho[j];
       if (i== 0) {
-        printf("rho is %lf gradF[0] = %lf\n",sp->rho[j],fp->gradF[0] );
+        //printf("rho is %lf gradF[0] = %lf\n",sp->rho[j],fp->gradF[0] );
       }
     }
   }
@@ -138,6 +138,11 @@ void findWorst(int *worst, int* target, int* change, int *n, struct denseData *d
   if (*n > 0) {
     (*change) = 1;
     *n -= fp->p;
+    if(*n >= fp->p){
+      *n -= fp->p;
+      printf("n is now after %d\n",*n );
+      (*change) = -1;
+    }
   }
   else {
     (*change) = -1;
@@ -238,6 +243,10 @@ void spreadChange(struct denseData *ds, struct Fullproblem *fp, struct Projected
 int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *sp, int n)
 /* Function to swap out a single element from the active set. */
 {
+  int flag = 0;
+  if (n>0) {
+    flag = 1;
+  }
   int worst = -1;
   int target, change=1;
 
@@ -246,12 +255,14 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
 
   printf("worst is %d\n",worst );
   double diff;
-  if (change<0) {
-    diff = -fp->alpha[fp->active[n]];
-  }
-  else{
+  if (change > 0 || flag == 1) {
     diff = fp->alpha[fp->active[n]] - fp->C;
   }
+  else{
+    diff = -fp->alpha[fp->active[n]];
+  }
+
+  printf("diff is %lf\n",diff );
 
   if(worst < 0)
   {
@@ -268,7 +279,27 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
 
   int temp = fp->active[n];
 
-  if (change < 0)
+  if (flag)
+  {
+    if (ds->y[fp->inactive[worst]] == target) {
+      adjustGradF(fp, ds, sp, n, worst, change, 1);
+      fp->alpha[fp->inactive[worst]] += diff*change;
+      fp->alpha[fp->active[n]] = sp->C;
+      fp->active[n] = fp->inactive[worst];
+      fp->inactive[worst] = temp;
+      fp->beta[worst] = DBL_MAX;
+    }
+    else{
+      adjustGradF(fp, ds, sp, n, worst, change, 0);
+      //printf("alpha is %lf  and  target is %d and ina is %lf\n\n\n",fp->alpha[fp->active[n]], target,ds->y[fp->inactive[worst]]);
+      fp->alpha[fp->inactive[worst]] += sp->C - fp->alpha[fp->active[n]];
+      fp->alpha[fp->active[n]] = sp->C;
+      fp->active[n] = fp->inactive[worst];
+      fp->inactive[worst] = temp;
+      fp->beta[worst] = DBL_MAX;
+    }
+  }
+  else
   {
     if (ds->y[fp->inactive[worst]] == target) {
       adjustGradF(fp, ds, sp, n, worst, change, 1);
@@ -282,26 +313,6 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
       adjustGradF(fp, ds, sp, n, worst, change, 0);
       fp->alpha[fp->inactive[worst]] += fp->alpha[fp->active[n]];
       fp->alpha[fp->active[n]] = 0.0;//sp->C ;
-      fp->active[n] = fp->inactive[worst];
-      fp->inactive[worst] = temp;
-      fp->beta[worst] = DBL_MAX;
-    }
-  }
-  else
-  {
-    if (ds->y[fp->inactive[worst]] == target) {
-      adjustGradF(fp, ds, sp, n, worst, change, 1);
-      fp->alpha[fp->inactive[worst]] -= sp->C - fp->alpha[fp->active[n]];
-      fp->alpha[fp->active[n]] = sp->C;
-      fp->active[n] = fp->inactive[worst];
-      fp->inactive[worst] = temp;
-      fp->beta[worst] = DBL_MAX;
-    }
-    else{
-      adjustGradF(fp, ds, sp, n, worst, change, 0);
-      //printf("alpha is %lf  and  target is %d and ina is %lf\n\n\n",fp->alpha[fp->active[n]], target,ds->y[fp->inactive[worst]]);
-      fp->alpha[fp->inactive[worst]] += sp->C - fp->alpha[fp->active[n]];
-      fp->alpha[fp->active[n]] = sp->C;
       fp->active[n] = fp->inactive[worst];
       fp->inactive[worst] = temp;
       fp->beta[worst] = DBL_MAX;

@@ -5,6 +5,15 @@
 
 #include <stdio.h>
 
+#define RED   "\x1B[31m"
+#define GRN   "\x1B[32m"
+#define YEL   "\x1B[33m"
+#define BLU   "\x1B[34m"
+#define MAG   "\x1B[35m"
+#define CYN   "\x1B[36m"
+#define WHT   "\x1B[37m"
+#define RESET "\x1B[0m"
+
 void freeDenseData(struct denseData *ds);
 void  freeFullproblem(struct Fullproblem *fp);
 void   freeSubProblem( struct Projected* sp);
@@ -44,7 +53,14 @@ int main(int argc, char *argv[]) {
   // Input processed:
   parse_arguments(argc, argv, &filename, &parameters);
   read_file(filename, &ds);
-  preprocess(&ds);
+  //preprocess(&ds);
+
+  for (int i = 0; i < ds.nInstances; i++) {
+    for (int j = 0; j < ds.nFeatures; j++) {
+//      printf("%lf\t",ds.data[i][j] );
+    }
+//    printf("\n" );
+  }
 
   double* bigH = malloc(sizeof(double)*ds.nInstances*ds.nInstances);
   double** fullBigH = malloc(sizeof(double*)*ds.nInstances);
@@ -65,23 +81,38 @@ int main(int argc, char *argv[]) {
   int p = 4;
 
   if(parameters.test){
-    p = 3;
+    p = 6;
     alloc_prob(&fp, &ds, p);
     init_prob(&fp, &ds);
     alloc_subprob(&sp, p, &fp, &ds);
     int j = 0;
     for (int i = 0; i < fp.n; i++) {
-      if (i != 0 && i != 25 && i != 29) {
-        fp.inactive[j] = i;
+      if (i != 0 && i != 21 && i != 22 && i!= 26 && i!= 27 &&i != 29) {
+        //fp.inactive[j] = i;
         j++;
       }
     }
+    double b = 1.0;
+    double w[6] = {0};
+/*    fp.alpha[0] = 0.644867;
+    fp.alpha[23] = 0.042496;
+    fp.alpha[24] = 0.322492;
+    fp.alpha[29] = 0.015981;
+    fp.alpha[31] = 0.017263;
+    fp.alpha[42] = 0.331627;
+
+   fp.alpha[0] = 0.422359;
+    fp.alpha[21] = 0.053925;
+    fp.alpha[22] = 0.132490;
+    fp.alpha[26] = 0.002135;
+    fp.alpha[27] = 0.218904;
+    fp.alpha[29] = 0.122755;
     fp.active[0] = 0;
-    fp.active[1] = 25;
-    fp.active[2] = 29;
-    fp.alpha[0] = 1.992153;
-    fp.alpha[25] = 1.640305;
-    fp.alpha[29] = 0.351848;
+    fp.active[1] = 23;
+    fp.active[2] = 24;
+    fp.active[3] = 29;
+    fp.active[4] = 31;
+    fp.active[5] = 42;
 
     setH(&fp, &ds);
     init_subprob(&sp, &fp, &ds);
@@ -94,7 +125,16 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < fp.p; i++) {
       b -= sp.H[0][i]*fp.alpha[fp.active[i]];
     }
-    b*=ds.y[fp.active[0]];
+    b*=ds.y[fp.active[0]];*/
+
+//    b = -3.232725;
+//    w[0] = 1.990551;
+//    w[1] = 4.796454;
+//    w[2] = 2.349260;
+//    w[3] = -1.834291;
+//    w[4] = -0.552713;
+//    w[5] = 2.442322;
+
     for (int i = 0; i < ds.nFeatures; i++) {
       w[i] = 0.0;
       for (int j = 0; j < fp.p; j++) {
@@ -103,14 +143,42 @@ int main(int argc, char *argv[]) {
       printf("w[%d] = %lf\n",i,w[i] );
     }
     printf("b = %lf\n",b );
+//    w[0] = 0.053472;
+//    w[1] = 0.857047;
+//    w[2] = 0.113283;
+//    w[3] = -0.633197;
+//    w[4] = 0.113730;
+//    w[5] = 0.883188;
+//    b = -120.643673;
+//w[0] = 0.011683;
+//w[1] = 0.543727;
+//w[2] = 0.106535;
+//w[3] = -0.161800;
+//w[4] = 0.276387;
+//w[5] = 0.736963;
+//b = -90.489;
+w[0] = 0.032127;
+w[1] = 0.695900;
+w[2] = 0.102318;
+w[3] = -0.288977;
+w[4] = 0.185400;
+w[5] = 0.872512;
+b = -105.160429;
     for (int i = 0; i < fp.n; i++) {
       double res = b;
       for (int j = 0; j < ds.nFeatures; j++) {
         res += w[j]*ds.data[i][j];
       }
-      printf("res[%d] = %lf\n",i,res );
+      if (ds.y[i]*res < 0.0) {
+        printf("%sres[%d] = %.3lf%s\n",RED,i,res,RESET );
+      }
+      else{
+        printf("%sres[%d] = %.3lf%s\n",GRN,i,res,RESET );
+      }
+
     }
     return 0;
+
   }
 
   // Full problem allocated and filled in, all alpha = 0.0 all gradF = 1.0:
@@ -125,14 +193,14 @@ int main(int argc, char *argv[]) {
 
   // We loop until no negative entries in beta:
   int k = 1;
-  int max_iters = 40;
+  int max_iters = 100;
   int itt = 0;
   int n = 0;
 
   while(k){
   //  break;
     // H matrix columns re-set and subproblem changed
-    printf("i = %d\n",itt );
+    printf("itt = %d\n",itt );
     setH(&fp, &ds);
     init_subprob(&sp, &fp, &ds);
 
@@ -142,6 +210,8 @@ int main(int argc, char *argv[]) {
     //  n = 0 if algorithm completes
     //  n != 0 if algorithm interrupt
     n = cg(&sp, &fp);
+    printf("n is %d\n",n );
+
 
     updateAlphaR(&fp, &sp);
     for (int i = 0; i < fp.n; i++) {
@@ -151,14 +221,22 @@ int main(int argc, char *argv[]) {
       }
     }
     for (int i = 0; i < fp.p; i++) {
-      printf("active is %d\n",fp.active[i] );
+      //printf("active is %d\n",fp.active[i] );
     }
     for (int i = 0; i < fp.q; i++) {
-      printf("INactive is %d\n",fp.inactive[i] );
+      //printf("INactive is %d\n",fp.inactive[i] );
     }
     for (int i = 0; i < fp.n; i++) {
-      printf("%lf\n",fp.gradF[i]-check[i] );
+      printf("check is %lf\n",fp.gradF[i]-check[i] );
+      if (fabs(fp.gradF[i] - check[i]) > 0.00001 ) {
+        printf("here\n" );
+        for (int i = 0; i < fp.n; i++) {
+          //printf("alpha[%d] == %lf (%lf)\n",i,fp.alpha[i], fp.gradF[i]-check[i] );
+        }
+        exit(22);
+      }
     }
+
     calcYTR(&sp, &fp);
     printf("total ytr %lf\n",sp.ytr );
     printf("ytr %lf\n",sp.ytr/(double)(fp.p) );
@@ -177,7 +255,7 @@ int main(int argc, char *argv[]) {
     }
     for (int i = 0; i < fp.q; i++) {
       if (fp.beta[i] < 0.0) {
-        printf("beta[%d] = %lf\n",fp.inactive[i],fp.beta[i] );
+        printf("beta[%d](%d) = %lf\n",i,fp.inactive[i],fp.beta[i] );
       }
     }
     if (n==0) {
@@ -208,6 +286,10 @@ int main(int argc, char *argv[]) {
       // While BCs broken
       k = singleswap(&ds, &fp, &sp, n);
       printf("k is %d\n",k );
+      if (n >= fp.p) {
+        printf("Exceeding %d with %d\n",fp.p,n );
+        //exit(5);
+      }
       for (int i = 0; i < fp.q; i++) {
         printf("%lf\n",fp.beta[i] );
       }
@@ -225,9 +307,8 @@ int main(int argc, char *argv[]) {
     }
 
     itt++;
-    printf("%d\n",itt );
     if(itt == max_iters){
-      printf("Reached max iters!!!!!\n\n\n" );
+      printf("Reached max iters (%d)!!!!!\n\n\n",itt );
       break;
     }
   }
@@ -239,7 +320,7 @@ int main(int argc, char *argv[]) {
   printf("beta[%d](%d) = % lf\n",i,fp.inactive[i],fp.beta[i] );
   }
   if (k==0) {
-    //printf("k goes to 0.\n");
+    printf("k goes to 0.\n");
   }
 
   //Memory freed
@@ -347,26 +428,31 @@ int findWorstest(struct Fullproblem *fp , int add, int* temp, int* temp2)
       }
     }
   }
-  int flag;
-  for (int i = 0; i < add; i++) {
-    flag = 0;
-    for (int j = 0; j < add; j++) {
-      if (fp->inactive[fp->q - 2 + i] == temp[i]) {
-        flag = 1;
-      }
-    }
-    if (flag == 0) {
-      temp2[i] = fp->inactive[fp->q - 2 + i];
-//      betaVal[i] = DBL_MAX;
-    }
-  }
 
   for (int i = 0; i < add; i++) {
     if (betaVal[i] > 0) {
       printf("%lf\n",betaVal[i] );
-      return i;
+      add = i;
     }
   }
+
+  int flag;
+  int k = 0;
+  for (int i = 0; i < add; i++) {
+    flag = 0;
+    for (int j = 0; j < add; j++) {
+      if (fp->inactive[fp->q - add + i] == temp[i]) {
+        flag = 1;
+      }
+    }
+    if (flag == 0) {
+      temp2[k] = fp->inactive[fp->q - add + i];
+      k++;
+//      betaVal[i] = DBL_MAX;
+    }
+  }
+
+
   printf("temp are %d and %d\n",temp[0],temp[1] );
   printf("temp2 are %d and %d\n",temp2[0],temp2[1] );
 

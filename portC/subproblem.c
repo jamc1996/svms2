@@ -53,7 +53,47 @@ void init_subprob(struct Projected *sp, struct Fullproblem *fp, struct denseData
 
 int cgSLS(struct Projected *sp, struct Fullproblem *fp)
 {
-
+  double* x = malloc(sizeof(double)*sp->p);
+  double* y = malloc(sizeof(double)*sp->p);
+  double* g = malloc(sizeof(double)*sp->p);
+  double* gA = malloc(sizeof(double)*sp->p);
+  double* p = malloc(sizeof(double)*sp->p);
+  for (int i = 0; i < sp->p; i++) {
+    x[i] = 0.0;
+    y[i] = 0.0;
+    g[i] = -sp->rHat[i];
+    for (int j = 0; j < sp->p; j++) {
+      g[i] += sp->yHat[j]*sp->rHat[j]/(double)sp->p;
+    }
+    gA[i] = 0.0;
+    for (int j = 0; j < sp->p; j++) {
+      if(i<j){
+        gA[i] += sp->H[i][j]*g[j];
+      }
+      else{
+        gA[i] += sp->H[j][i]*g[j];
+      }
+    }
+  }
+  for (int i = 0; i < sp->p; i++) {
+    for (int j = 0; j < sp->p; j++) {
+      if(i<j){
+        gA[i] += sp->H[i][j]*g[j];
+      }
+      else{
+        gA[i] += sp->H[j][i]*g[j];
+      }
+    }
+    p[i] = gA[i];
+  }
+  double AxySq;
+  double gAsQ;
+  double lambda, Alambda;
+  while(AxySq + gAsQ > 0.001)
+  {
+    lambda = 8;
+    Alambda = 9;
+  }
 }
 
 int cg(struct Projected *sp, struct Fullproblem *fp)
@@ -66,19 +106,31 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
   int problem = 0;
   int i=0;
   int flag = 1;
-  while (rSq > 0.00000000001 && i<10) {
+  while (rSq > 0.00000000001) {
     calc_Hrho(sp);
-    if (inner_prod(sp->Hrho, sp->rho, sp->p) < 0.0000001) {
-      printf("Yeah screw it\n" );
+
+    if (inner_prod(sp->Hrho, sp->rho, sp->p) < 0.0001) {
+      printf("%lf\n",inner_prod(sp->Hrho, sp->rho, sp->p) );
+      for (int j = 0; j < fp->p; j++) {
+        printf("act = %d\n",fp->active[j] );
+      }
+      return 0;
     }
     lambda = rSq/inner_prod(sp->Hrho, sp->rho, sp->p);
     linearOp(sp->alphaHat, sp->rho, lambda, sp->p);
 
     problem = checkConstraints(sp, fp);
+
     if(problem){
-      if (problem > sp->p || problem < -sp->p) {
-        //linearOp(sp->alphaHat, sp->rho, -lambda, sp->p);
+      printf("uoh\n" );
+      if (problem >= sp->p*2) {
+        printf("chaning\n" );
+        linearOp(sp->alphaHat, sp->rho, -lambda, sp->p);
         return problem;
+      }
+      else if( problem < -sp->p*2){
+        //linearOp(sp->alphaHat, sp->rho, -lambda, sp->p);
+        //return problem + sp->p;
       }
       return problem;
     }
@@ -90,7 +142,8 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
     mu = newRSQ/rSq;
     linearOp2(sp->rho, sp->gamma, mu, sp->p);
     rSq = newRSQ;
-    i++;
+    printf("rsq = %lf, i is %d\n",rSq,i );
+    //i++;
   }
 
   return 0;
@@ -142,10 +195,10 @@ void calc_Hrho(struct Projected *sp)
   for (int i = 0; i < sp->p; i++) {
     sp->Hrho[i] = 0.0;
     for (int j = 0; j < i; j++) {
-      sp->Hrho[i]+= sp->H[j][i]*sp->rho[j];
+      sp->Hrho[i] += sp->H[j][i]*sp->rho[j];
     }
     for (int j = i; j < sp->p; j++) {
-      sp->Hrho[i]+= sp->H[i][j]*sp->rho[j];
+      sp->Hrho[i] += sp->H[i][j]*sp->rho[j];
     }
   }
 }
@@ -155,12 +208,28 @@ void calc_Hrho(struct Projected *sp)
 int checkConstraints(struct Projected* sp, struct Fullproblem *fp)
 /* Function to check if any constrainst have been violated by the cg process. */
 {
+  int flag = -1;
   double* temp = (double*)malloc(sizeof(double)*sp->p);
   constraint_projection(temp, sp->alphaHat, sp->yHat, sp->p);
   for (int i = 0; i < sp->p; i++) {
     temp[i] += fp->alpha[ fp->active[i] ];
-  }
+    printf("temp[%d] = %lf\n",i,temp[i] );
 
+  }
+  for (int i = 0; i < sp->p; i++) {
+    if(temp[i]>2*sp->C){
+      flag = i;
+      for (int j = 0; j < sp->p; j++) {
+        if (temp[i] < temp[j]) {
+          flag = j;
+        }
+      }
+      free(temp);
+      return flag+sp->p+sp->p;
+    }
+    //printf("temp[%d] = %lf\n",i,temp[i] );
+  }
+printf("fp-> %lf\n",temp[0] );
   for (int i = 0; i < sp->p; i++) {
     if(temp[i]>sp->C){
       if (temp[i]>sp->C*2) {

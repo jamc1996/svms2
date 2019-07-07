@@ -25,5 +25,10 @@ fullproblem.o: fullproblem.c fullproblem.h
 clean:
 	rm -f gert $(objects)
 
-test: gert
+alt_test: gert
 	./gert -f alt.txt
+
+test: gert
+	./gert -f train.txt
+	./gert -f test.txt -k
+
