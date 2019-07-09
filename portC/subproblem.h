@@ -27,4 +27,7 @@ void constraint_projection(double* vecOut, double* vecIn, double* y, int p);
 
 double inner_prod(double *a, double *b, int p);
 
+
+void   freeSubProblem( struct Projected* sp);
+
 #endif

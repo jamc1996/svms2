@@ -7,6 +7,9 @@
 #include <float.h>
 #include "svm.h"
 
+void changeP( struct Fullproblem *fp, struct Projected *sp, int add);
+int findWorstest(struct Fullproblem *fp , int add, int* temp, int* temp2);
+void shrinkSize( struct Fullproblem *fp, struct Projected *sp, int k);
 void alloc_prob(struct Fullproblem *prob, struct denseData *ds, int p);
 void init_prob(struct Fullproblem *prob, struct denseData *ds);
 void updateAlphaR(struct Fullproblem *fp, struct Projected *sp);
@@ -18,4 +21,8 @@ void adjustGradF(struct Fullproblem *fp, struct denseData *ds, struct Projected 
 int checkfpConstraints(struct Fullproblem *fp);
 void findWorst(int *worst, int* target, int* change, int *n, struct denseData *ds, struct Fullproblem *fp);
 void spreadChange(struct denseData *ds, struct Fullproblem *fp, struct Projected *sp, int target, double diff, int change, int n);
+void reinitprob( struct Fullproblem *fp, struct Projected *sp, int add, int* temp, int* temp2);
+
+void  freeFullproblem(struct Fullproblem *fp);
+
 #endif

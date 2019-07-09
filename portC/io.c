@@ -1,6 +1,6 @@
 #include "io.h"
 
-void read_file(char* const filename, struct denseData* ds){
+void read_file(char* filename, struct denseData* ds){
   FILE *fp = fopen(filename, "r");
   count_entries(fp, ds);
 
@@ -102,6 +102,120 @@ void count_entries(FILE *input, struct denseData* ds)
   }
 
   rewind(input);
+}
+
+void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filename){
+  FILE *file = fopen(filename, "w");
+  fprintf(file, "%d\n",ds->nFeatures );
+  printf("ok\n" );
+
+  int count = 0;
+  for (int i = 0; i < fp->n; i++) {
+    if (fp->alpha[i] > 0.0) {
+      count++;
+    }
+  }
+  int * active = malloc(sizeof(int)*count);
+  int j = 0;
+  for (int i = 0; i < fp->n; i++) {
+    if (fp->alpha[i] > 0.0) {
+      active[j] = i;
+      j++;
+    }
+  }
+  double *h = malloc(sizeof(double)*fp->n*count);
+  double **H = malloc(sizeof(double*)*fp->n);
+  for (int i = 0; i < fp->n; i++) {
+    H[i] = &h[i*count];
+  }
+  printf("ok\n" );
+  for (int i = 0; i < fp->n; i++) {
+    for (int j = 0; j < count; j++) {
+      H[i][j] = 0.0;
+      for (int k = 0; k < ds->nFeatures; k++) {
+        H[i][j] += ds->data[i][k]*ds->data[active[j]][k];
+      }
+      H[i][j] *= ds->y[active[j]]*ds->y[i];
+    }
+  }
+  int r = -1;
+  for (int i = 0; i < count; i++) {
+    if (fp->alpha[active[i]] < fp->C*0.99) {
+      r = active[i];
+      break;
+    }
+  }
+  if (r<0) {
+    exit(77);
+  }
+  printf("r is %d\n",r );
+  double b = 1.0;
+  for (int i = 0; i < count; i++) {
+    b -= H[r][i]*fp->alpha[active[i]];
+  }
+  b *= ds->y[r];
+
+  printf("b is %lf\n",b );
+  double *w = malloc(sizeof(double)*ds->nFeatures);
+  for (int i = 0; i < ds->nFeatures; i++) {
+    w[i] = 0.0;
+    for (int j = 0; j < count; j++) {
+      w[i] += fp->alpha[active[j]]*ds->data[active[j]][i]*ds->y[active[j]];
+    }
+    printf("w[%d] = %lf\n",i,w[i] );
+  }
+
+
+
+  fprintf(file, "%lf\n",b );
+  for (int i = 0; i < ds->nFeatures; i++) {
+    fprintf(file, "%lf\n",w[i] );
+  }
+  free(active);
+  free(h);
+  free(H);
+  free(w);
+  fclose(file);
+}
+
+void testSavedModel(struct denseData *ds, char* fn)
+{
+  FILE *fp = fopen(fn, "r");
+  int k;
+  double b;
+  int res = fscanf(fp, "%d",&k);
+  if (res == EOF) {
+    exit(2222);
+  }
+  res = fscanf(fp, "%lf", &b);
+  double *w = malloc(sizeof(double)*k);
+  for (size_t i = 0; i < k; i++) {
+    res = fscanf(fp, "%lf",&w[i]);
+  }
+  printf("b = %lf\n",b );
+  for (int i = 0; i < k; i++) {
+    printf("w[] = %lf\n",w[i] );
+  }
+
+  printf("ok\n" );
+  for (int i = 0; i < ds->nInstances; i++) {
+    double res = b;
+    for (int j = 0; j < ds->nFeatures; j++) {
+      res += w[j]*ds->data[i][j];
+    }
+    if (ds->y[i]*res < 0.0) {
+      printf("%sres[%d] = %.3lf%s\n",RED,i,res,RESET );
+    }
+    else{
+      printf("%sres[%d] = %.3lf%s\n",GRN,i,res,RESET );
+    }
+
+  }
+
+
+
+  fclose(fp);
+
 }
 
 int readline(FILE *input, char **line)
@@ -218,4 +332,39 @@ void calcStdDev(double* stdDev, double* mean, struct denseData *ds)
   for (int i = 0; i < ds->nFeatures; i++) {
     stdDev[i] = sqrt(stdDev[i]/((double)(ds->nInstances)-1.0));
   }
+}
+
+
+void cleanData( struct denseData *ds){
+  for (int i = 0; i < ds->nInstances - 1; i++) {
+    printf("%d\n",i );
+    for (int j = i; j < ds->nInstances; j++) {
+      int flag = 1;
+      double check;
+      double previous = ds->data[i][0]/ds->data[j][0];
+      for (int k = 1; k < ds->nFeatures; k++) {
+        check = ds->data[i][k]/ds->data[j][k];
+        printf("%lf and %lf\n",previous,check );
+        if (fabs(check - previous) > 0.0001 ) {
+          flag = 0;
+          break;
+        }
+        previous = check;
+      }
+      if (flag == 1) {
+        printf("%d is broken\n",j );
+      }
+    }
+  }
+}
+
+
+void freeDenseData(struct denseData *ds)
+/* Function to free dynamically allocated memory in dense data set struct. */
+{
+  free(ds->data);
+  free(ds->data1d);
+  free(ds->y);
+  free(ds->instanceLabels);
+  free(ds->featureLabels);
 }

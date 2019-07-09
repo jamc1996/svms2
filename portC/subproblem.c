@@ -106,14 +106,15 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
   int problem = 0;
   int i=0;
   int flag = 1;
-  while (rSq > 0.00000000001) {
+  while (rSq > 0.0000001) {
     calc_Hrho(sp);
 
-    if (inner_prod(sp->Hrho, sp->rho, sp->p) < 0.0001) {
+    if (inner_prod(sp->Hrho, sp->rho, sp->p) < 0.00000001) {
       printf("%lf\n",inner_prod(sp->Hrho, sp->rho, sp->p) );
       for (int j = 0; j < fp->p; j++) {
         printf("act = %d\n",fp->active[j] );
       }
+      exit(250);
       return 0;
     }
     lambda = rSq/inner_prod(sp->Hrho, sp->rho, sp->p);
@@ -283,4 +284,21 @@ double inner_prod(double *a, double *b, int p)
     val+=a[i]*b[i];
   }
   return val;
+}
+
+
+
+void   freeSubProblem( struct Projected* sp)
+/* Function to free dynamically allocated memory in subproblem stuct. */
+{
+  free(sp->alphaHat);
+  free(sp->yHat);
+  free(sp->rHat);
+  free(sp->H);
+
+  free(sp->gamma);
+  free(sp->rho);
+  free(sp->Hrho);
+
+  free(sp->h);
 }
