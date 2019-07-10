@@ -1,7 +1,9 @@
 #include "subproblem.h"
 
 
-void alloc_subprob(struct Projected *sp, int p, struct Fullproblem *fp, struct denseData *ds)
+void alloc_subprob(struct Projected *sp, int p)
+/*  Function to allocate space to solve the projected problem of size p.
+ */
 {
   sp->p = p;
   sp->C = 1000.0;
@@ -9,14 +11,13 @@ void alloc_subprob(struct Projected *sp, int p, struct Fullproblem *fp, struct d
   sp->alphaHat = malloc(sizeof(double)*p);
   sp->yHat = malloc(sizeof(double)*p);
   sp->rHat = malloc(sizeof(double)*p);
-
   sp->gamma = malloc(sizeof(double)*p);
   sp->rho = malloc(sizeof(double)*p);
   sp->Hrho = malloc(sizeof(double)*p);
 
+  // H symmetric so can save space:
   sp->H = malloc(sizeof(double*)*p);
   sp->h = malloc(sizeof(double)*((p*(p+1))/2));
-
   int j = 0;
   for (int i = 0; i < p; i++) {
     sp->H[i] = &(sp->h[j]);
@@ -52,6 +53,7 @@ void init_subprob(struct Projected *sp, struct Fullproblem *fp, struct denseData
 }
 
 int cgSLS(struct Projected *sp, struct Fullproblem *fp)
+/* Maybe a more stable build. */
 {
   double* x = malloc(sizeof(double)*sp->p);
   double* y = malloc(sizeof(double)*sp->p);
@@ -86,17 +88,19 @@ int cgSLS(struct Projected *sp, struct Fullproblem *fp)
     }
     p[i] = gA[i];
   }
-  double AxySq;
-  double gAsQ;
-  double lambda, Alambda;
+  double AxySq =0.0;
+  double gAsQ =0.0;
+  double lambda = 0.0, Alambda = 0.0;
   while(AxySq + gAsQ > 0.001)
   {
     lambda = 8;
     Alambda = 9;
   }
+  return 77;
 }
 
 int cg(struct Projected *sp, struct Fullproblem *fp)
+/* Conjugate gradient method to solve projected subproblem. */
 {
   double lambda, mu;
   init_error(sp);
@@ -104,18 +108,16 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
 
   double newRSQ;
   int problem = 0;
-  int i=0;
-  int flag = 1;
+
   while (rSq > 0.0000001) {
     calc_Hrho(sp);
 
-    if (inner_prod(sp->Hrho, sp->rho, sp->p) < 0.00000001) {
+    if (fabs(inner_prod(sp->Hrho, sp->rho, sp->p)) < 0.00000000000000000000000000001) {
       printf("%lf\n",inner_prod(sp->Hrho, sp->rho, sp->p) );
       for (int j = 0; j < fp->p; j++) {
         printf("act = %d\n",fp->active[j] );
       }
       exit(250);
-      return 0;
     }
     lambda = rSq/inner_prod(sp->Hrho, sp->rho, sp->p);
     linearOp(sp->alphaHat, sp->rho, lambda, sp->p);
@@ -123,13 +125,12 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
     problem = checkConstraints(sp, fp);
 
     if(problem){
-      printf("uoh\n" );
       if (problem >= sp->p*2) {
-        printf("chaning\n" );
         linearOp(sp->alphaHat, sp->rho, -lambda, sp->p);
         return problem;
       }
       else if( problem < -sp->p*2){
+        exit(79);
         //linearOp(sp->alphaHat, sp->rho, -lambda, sp->p);
         //return problem + sp->p;
       }
@@ -141,10 +142,11 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
     newRSQ = inner_prod(sp->gamma, sp->gamma, sp->p);
 
     mu = newRSQ/rSq;
+
     linearOp2(sp->rho, sp->gamma, mu, sp->p);
+
     rSq = newRSQ;
-    printf("rsq = %lf, i is %d\n",rSq,i );
-    //i++;
+
   }
 
   return 0;
@@ -156,7 +158,6 @@ void calcYTR(struct Projected *sp, struct Fullproblem *fp)
   sp->ytr = 0.0;
   for (int i = 0; i < sp->p; i++) {
     sp->ytr += sp->yHat[i]*fp->gradF[fp->active[i]];
-    printf("ytr is now %lf\n",sp->ytr );
   }
 }
 
@@ -214,8 +215,6 @@ int checkConstraints(struct Projected* sp, struct Fullproblem *fp)
   constraint_projection(temp, sp->alphaHat, sp->yHat, sp->p);
   for (int i = 0; i < sp->p; i++) {
     temp[i] += fp->alpha[ fp->active[i] ];
-    printf("temp[%d] = %lf\n",i,temp[i] );
-
   }
   for (int i = 0; i < sp->p; i++) {
     if(temp[i]>2*sp->C){
@@ -230,7 +229,7 @@ int checkConstraints(struct Projected* sp, struct Fullproblem *fp)
     }
     //printf("temp[%d] = %lf\n",i,temp[i] );
   }
-printf("fp-> %lf\n",temp[0] );
+
   for (int i = 0; i < sp->p; i++) {
     if(temp[i]>sp->C){
       if (temp[i]>sp->C*2) {

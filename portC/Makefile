@@ -25,10 +25,20 @@ fullproblem.o: fullproblem.c fullproblem.h
 clean:
 	rm -f gert $(objects)
 
-alt_test: gert
-	./gert -f alt.txt
+test: testPHP testStates testBasketball
 
-test: gert
-	./gert -f train.txt
-	./gert -f test.txt -k
+testPHP: gert
+	./gert -f phpVDlhKL.csv -s phpModel.txt
+	./gert -f phpVDlhKL.csv -k phpModel.txt
 
+testStates: gert
+	./gert -f alt.txt -s altModel.txt
+	./gert -f alt.txt -k altModel.txt
+
+testBasketball: gert
+	./gert -f basketball.csv -s bball.txt
+	./gert -f basketball.csv -k bball.txt
+
+testKC1: gert
+	./gert -f kc1.csv -s kc1Model.txt
+	./gert -f kc1.csv -k kc1Model.txt

@@ -140,7 +140,6 @@ void findWorst(int *worst, int* target, int* change, int *n, struct denseData *d
     *n -= fp->p;
     if(*n >= fp->p){
       *n -= fp->p;
-      printf("n is now after %d\n",*n );
       (*change) = -1;
     }
   }
@@ -253,7 +252,6 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
 
   findWorst(&worst,&target,&change,&n, ds, fp);
 
-  printf("worst is %d and %d\n",worst, fp->inactive[worst] );
   double diff;
   if (change > 0 || flag == 1) {
     diff = change*(fp->alpha[fp->active[n]] - fp->C)  ;
@@ -262,7 +260,6 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
     diff = -fp->alpha[fp->active[n]];
   }
 
-  printf("diff is %lf\n",diff );
 
   if(worst < 0)
   {
@@ -290,9 +287,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
       fp->beta[worst] = DBL_MAX;
     }
     else{
-      printf("this\n" );
       adjustGradF(fp, ds, sp, n, worst, change, 0, flag);
-      //printf("alpha is %lf  and  target is %d and ina is %lf\n\n\n",fp->alpha[fp->active[n]], target,ds->y[fp->inactive[worst]]);
       fp->alpha[fp->inactive[worst]] -= diff;
       fp->alpha[fp->active[n]] = sp->C;
       fp->active[n] = fp->inactive[worst];
@@ -329,9 +324,6 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
 
 int checkfpConstraints(struct Fullproblem *fp)
 {
-  for (int i = 0; i < fp->p; i++) {
-    printf("alpha[%d] = %lf\n",fp->active[i],fp->alpha[fp->active[i]] );
-  }
   for (int i = 0; i < fp->p; i++) {
     if(fp->alpha[fp->active[i]]>fp->C){
       return i+fp->p;
@@ -541,12 +533,10 @@ int findWorstest(struct Fullproblem *fp , int add, int* temp, int* temp2)
   }
   for (int i = 0; i < fp->q; i++)
   {
-    printf("beta is %lf\n",fp->beta[i] );
     for (int j = 0; j < add; j++)
     {
       if (fp->beta[i] < betaVal[j])
       {
-        printf("ok %d %lf\n", i, betaVal[j]);
         for (int k = add - 1; k > j ; k--)
         {
           temp[k] = temp[k-1];

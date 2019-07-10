@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <math.h>
+#include <getopt.h>
+
 #include "svm.h"
 
 #define RED   "\x1B[31m"
@@ -26,7 +28,6 @@ int parse_arguments(int argc, char *argv[], char** filename, struct svm_args *pa
 void cleanData( struct denseData *ds);
 void preprocess(struct denseData *ds);
 void calcMeans(double *mean, struct denseData *ds);
-
 void normalise(double* mean, double* stdDev, struct denseData* ds);
 void calcStdDev(double* stdDev, double* mean, struct denseData *ds);
 void freeDenseData(struct denseData *ds);

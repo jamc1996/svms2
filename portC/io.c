@@ -107,7 +107,6 @@ void count_entries(FILE *input, struct denseData* ds)
 void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filename){
   FILE *file = fopen(filename, "w");
   fprintf(file, "%d\n",ds->nFeatures );
-  printf("ok\n" );
 
   int count = 0;
   for (int i = 0; i < fp->n; i++) {
@@ -128,7 +127,7 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
   for (int i = 0; i < fp->n; i++) {
     H[i] = &h[i*count];
   }
-  printf("ok\n" );
+
   for (int i = 0; i < fp->n; i++) {
     for (int j = 0; j < count; j++) {
       H[i][j] = 0.0;
@@ -148,21 +147,19 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
   if (r<0) {
     exit(77);
   }
-  printf("r is %d\n",r );
+
   double b = 1.0;
   for (int i = 0; i < count; i++) {
     b -= H[r][i]*fp->alpha[active[i]];
   }
   b *= ds->y[r];
 
-  printf("b is %lf\n",b );
   double *w = malloc(sizeof(double)*ds->nFeatures);
   for (int i = 0; i < ds->nFeatures; i++) {
     w[i] = 0.0;
     for (int j = 0; j < count; j++) {
       w[i] += fp->alpha[active[j]]*ds->data[active[j]][i]*ds->y[active[j]];
     }
-    printf("w[%d] = %lf\n",i,w[i] );
   }
 
 
@@ -192,12 +189,7 @@ void testSavedModel(struct denseData *ds, char* fn)
   for (size_t i = 0; i < k; i++) {
     res = fscanf(fp, "%lf",&w[i]);
   }
-  printf("b = %lf\n",b );
-  for (int i = 0; i < k; i++) {
-    printf("w[] = %lf\n",w[i] );
-  }
-
-  printf("ok\n" );
+  int wrong = 0;
   for (int i = 0; i < ds->nInstances; i++) {
     double res = b;
     for (int j = 0; j < ds->nFeatures; j++) {
@@ -205,15 +197,17 @@ void testSavedModel(struct denseData *ds, char* fn)
     }
     if (ds->y[i]*res < 0.0) {
       printf("%sres[%d] = %.3lf%s\n",RED,i,res,RESET );
+      wrong++;
     }
     else{
       printf("%sres[%d] = %.3lf%s\n",GRN,i,res,RESET );
     }
-
   }
+  int right = ds->nInstances - wrong;
+  double pct = 100.0*((double)right/(double)ds->nInstances);
+  printf("%d correct classifications out of %d. %.2lf%% correct.\n",right,ds->nInstances,pct );
 
-
-
+  free(w);
   fclose(fp);
 
 }
@@ -253,8 +247,10 @@ int parse_arguments(int argc, char *argv[], char** filename, struct svm_args *pa
   parameters->verbose = 0;
   parameters->C = 1;
   parameters->test = 0;
-
-  while ((c = getopt( argc, argv, "f:kt:c:d:vh")) != -1){
+  parameters->modelfile = NULL;
+  parameters->save = 0;
+  parameters->savename = NULL;
+  while ((c = getopt( argc, argv, "f:k:t:c:d:vhs:")) != -1){
     switch (c) {
       case 'f':
         *filename = optarg;
@@ -267,9 +263,14 @@ int parse_arguments(int argc, char *argv[], char** filename, struct svm_args *pa
         break;
       case 'k':
         parameters->test = 1;
+        parameters->modelfile = optarg;
         break;
       case 'd':
         parameters->degree = atoi(optarg);
+        break;
+      case 's':
+        parameters->save = 1;
+        parameters->savename = optarg;
         break;
       case 'v':
         parameters->verbose = 1;

@@ -9,7 +9,10 @@ struct svm_args
 	double C;	/* for C_SVC, EPSILON_SVR and NU_SVR */
 	int verbose;
 	int test;
-};
+	char* modelfile;
+	int save;
+	char* savename;
+} clargs;
 
 
 struct denseData{
@@ -22,6 +25,25 @@ struct denseData{
 	double* y;
   char** instanceLabels;
   char** featureLabels;
+};
+
+struct CGSLSProj{
+	// Re-inited each time:
+	double* alphaHat;
+	double* yHat;
+	double* rHat;
+	double** H;
+
+	// Will be set during CG iterations
+	double* gamma;
+	double* rho;
+	double* Hrho;
+
+	// Changed independent (p size, ytr calc) or unchanging
+	int p;
+	double C;
+	double* h;
+	double ytr;
 };
 
 struct Projected{
@@ -41,7 +63,7 @@ struct Projected{
 	double C;
 	double* h;
 	double ytr;
-};
+}Subproblem;
 
 struct Fullproblem{
 	int n;
