@@ -2,6 +2,7 @@
 #include "io.h"
 #include "fullproblem.h"
 #include "subproblem.h"
+#include "kernels.h"
 
 #include <stdio.h>
 
@@ -25,25 +26,27 @@ int main(int argc, char *argv[]) {
   parse_arguments(argc, argv, &filename, &parameters);
   read_file(filename, &ds);
   //preprocess(&ds);
+  //
+  // double* bigH = malloc(sizeof(double)*ds.nInstances*ds.nInstances);
+  // double** fullBigH = malloc(sizeof(double*)*ds.nInstances);
+  // for (int i = 0; i < ds.nInstances; i++) {
+  //   fullBigH[i] = &bigH[i*ds.nInstances];
+  //   for (int j = 0; j < ds.nInstances; j++) {
+  //     fullBigH[i][j] = 0.0;
+  //     for (int k = 0; k < ds.nFeatures; k++) {
+  //       fullBigH[i][j] += ds.data[i][k]*ds.data[j][k];
+  //     }
+  //     fullBigH[i][j] = pow(fullBigH[i][j]+parameters.Gamma, parameters.degree);
+  //     fullBigH[i][j] *= ds.y[j]*ds.y[i];
+  //   }
+  // }
+  // double* check = malloc(sizeof(double)*ds.nInstances);
 
-  //double* bigH = malloc(sizeof(double)*ds.nInstances*ds.nInstances);
-  //double** fullBigH = malloc(sizeof(double*)*ds.nInstances);
-  for (int i = 0; i < ds.nInstances; i++) {
-    //fullBigH[i] = &bigH[i*ds.nInstances];
-    for (int j = 0; j < ds.nInstances; j++) {
-      //fullBigH[i][j] = 0.0;
-      for (int k = 0; k < ds.nFeatures; k++) {
-        //fullBigH[i][j] += ds.data[i][k]*ds.data[j][k];
-      }
-      //fullBigH[i][j] *= ds.y[j]*ds.y[i];
-    }
-  }
-  double* check = malloc(sizeof(double)*ds.nInstances);
+
   //cleanData(&ds);
 
   // Projected problem size chosen temporarily
   int p = 4;
-
   if(parameters.test){
     testSavedModel(&ds, parameters.modelfile);
     return 0;
@@ -64,46 +67,70 @@ int main(int argc, char *argv[]) {
   int max_iters = 10000000;
   int itt = 0;
   int n = 0;
-
+  int newRows = 1;
   while(k){
   //  break;
     // H matrix columns re-set and subproblem changed
     //printf("\n\nitt = %d\n\n\n",itt );
-    if(itt%100000 == 0){
+    if(itt%10000 == 0){
       printf("itt = %d\n",itt );
     }
-    setH(&fp, &ds);
-    init_subprob(&sp, &fp, &ds);
+    if(newRows){
+      setH(&fp, &ds, &parameters);
+    }
+    init_subprob(&sp, &fp, &ds, &parameters, newRows);
+
 
     //  congjugate gradient algorithm
     //  n = 0 if algorithm completes
     //  n != 0 if algorithm interrupt
     n = cg(&sp, &fp);
 
-
+    if(n < -sp.p)
+    {
+      //exit(78);
+    }
+int john = (n+sp.p+sp.p)%sp.p;
     updateAlphaR(&fp, &sp);
     calcYTR(&sp, &fp);
     calculateBeta(&fp, &sp, &ds);
-
-    for (int i = 0; i < fp.n; i++) {
-      //check[i] = 1.0;
-      for (int j = 0; j < fp.n; j++) {
-        //check[i] -= fullBigH[i][j]*fp.alpha[j];
+    for (int i = 0; i < fp.q; i++) {
+      if (fp.beta[i] < 0) {
+        printf("beta[%d] == %lf (%d) (%lf)\n",i,fp.beta[i],fp.inactive[i],fp.alpha[fp.inactive[i]]);
       }
     }
-    for (int i = 0; i < fp.n; i++) {
-      if (fabs(fp.gradF[i] - check[i]) > 0.00001 ) {
-        //printf("n is %d/%d\n",n,fp.p );
-        //printf("here %lf\n",fabs(fp.gradF[i] - check[i]) );
-        //exit(22);
-      }
+    printf("%lf\n",sp.ytr );
+    printf("%d and %lf\n",john,fp.alpha[fp.active[john]] );
+    for (int i = 0; i < fp.p; i++) {
+      printf("activ %d\n",fp.active[i] );
     }
+    printf("\n" );
 
+    // for (int i = 0; i < fp.n; i++) {
+    //   check[i] = 1.0;
+    //   for (int j = 0; j < fp.n; j++) {
+    //     check[i] -= fullBigH[i][j]*fp.alpha[j];
+    //   }
+    // }
+    // for (int i = 0; i < fp.n; i++) {
+    //   if (fabs(fp.gradF[i] - check[i]) > 0.00001 ) {
+    //     printf("n is %d i is %d\n",fp.n,i );
+    //
+    //     printf("here %lf\n",fabs(fp.gradF[i] - check[i]) );
+    //     exit(22);
+    //   }
+    // }
+
+    //if (n < -fp.p) {
+    //  printf("%lf\n",fp.alpha[(n+fp.p+fp.p)%fp.p] );
+  //  }
 
 
     if (n==0) {
       printf("Converged! (itt = %d)\n", itt );
-
+      for (int i = 0; i < fp.n; i++) {
+        printf("alpha[%d] = %lf\n",i,fp.alpha[i] );
+      }
       int add = 2;
       int *temp = malloc(sizeof(int)*add);
       int *temp2 = malloc(sizeof(int)*add);
@@ -113,18 +140,22 @@ int main(int argc, char *argv[]) {
       }
       changeP(&fp, &sp, add);
       reinitprob(&fp, &sp, add, temp, temp2);
-
+      newRows = 1;
       free(temp);
       free(temp2);
     }
 
     if (n) {
       // BCs broken, fix one at a time for the moment
-      k = singleswap(&ds, &fp, &sp, n);
+      k = singleswap(&ds, &fp, &sp, n, &parameters);
       if (k < 0) {
         shrinkSize(&fp, &sp, k+fp.p);
+        newRows = 1;
       }
-      n = checkfpConstraints(&fp);
+      else{
+        n = checkfpConstraints(&fp);
+        newRows = 0;
+      }
     }
 
     itt++;

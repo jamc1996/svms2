@@ -2,13 +2,14 @@
 #define SUBPROBLEM_H
 
 #include "svm.h"
+#include "kernels.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
 
 void alloc_subprob(struct Projected *sp, int p);
-void init_subprob(struct Projected *sp, struct Fullproblem *fp, struct denseData *ds);
+void init_subprob(struct Projected *sp, struct Fullproblem *fp, struct denseData *ds, struct svm_args *params, int newRows);
 void init_symmetric(struct Projected *sp, int p);
 int cg(struct Projected *sp, struct Fullproblem *fp);
 int checkConstraints(struct Projected* sp, struct Fullproblem *fp);

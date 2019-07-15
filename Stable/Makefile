@@ -4,7 +4,7 @@ CC = gcc
 CPFLAGS = -Wall -std=c++11
 CFLAGS = -Wall -std=c99
 
-objects = main.o io.o fullproblem.o subproblem.o
+objects = main.o io.o fullproblem.o subproblem.o kernels.o
 
 gert: $(objects)
 	$(CC) $(CFLAGS) -o gert $(objects) -lm
@@ -15,10 +15,13 @@ main.o: main.c svm.h
 io.o: io.c io.h svm.h
 	$(CC) $(CFLAGS) -c $<
 
-subproblem.o: subproblem.c subproblem.h
+subproblem.o: subproblem.c subproblem.h svm.h
 	$(CC) $(CFLAGS) -c $<
 
-fullproblem.o: fullproblem.c fullproblem.h
+fullproblem.o: fullproblem.c fullproblem.h svm.h
+	$(CC) $(CFLAGS) -c $<
+
+kernels.o: kernels.c kernels.h svm.h
 	$(CC) $(CFLAGS) -c $<
 
 .PHONY: clean
@@ -46,3 +49,7 @@ testKC1: gert
 testFake: gert
 	./gert -f bigData.txt -s bigDataModel.txt
 	./gert -f bigData.txt -k bigDataModel.txt
+
+polyTest: gert
+	./gert -f circleData.txt -t 1 -d 2 -g 1 -s circleModel.txt
+	./gert -f circleData.txt -k circleModel.txt

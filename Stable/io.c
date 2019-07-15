@@ -250,7 +250,8 @@ int parse_arguments(int argc, char *argv[], char** filename, struct svm_args *pa
   parameters->modelfile = NULL;
   parameters->save = 0;
   parameters->savename = NULL;
-  while ((c = getopt( argc, argv, "f:k:t:c:d:vhs:")) != -1){
+  parameters->Gamma = 1;
+  while ((c = getopt( argc, argv, "f:k:t:c:d:vhs:g:")) != -1){
     switch (c) {
       case 'f':
         *filename = optarg;
@@ -259,7 +260,7 @@ int parse_arguments(int argc, char *argv[], char** filename, struct svm_args *pa
         parameters->type = atoi(optarg);
         break;
       case 'c':
-        parameters->C = atoi(optarg);
+        parameters->C = atof(optarg);
         break;
       case 'k':
         parameters->test = 1;
@@ -274,6 +275,9 @@ int parse_arguments(int argc, char *argv[], char** filename, struct svm_args *pa
         break;
       case 'v':
         parameters->verbose = 1;
+        break;
+      case 'g':
+        parameters->Gamma = atof(optarg);
         break;
       case 'h':
         printf("I was supposed to put in a help message here.\n");
