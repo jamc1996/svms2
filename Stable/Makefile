@@ -28,19 +28,19 @@ kernels.o: kernels.c kernels.h svm.h
 clean:
 	rm -f gert $(objects)
 
-test: testPHP testStates testBasketball testCircle
+test: testPHP testStates testBasketball testPoly
 
 testPHP: gert
-	./gert -f phpVDlhKL.csv -s phpModel.txt
-	./gert -f phpVDlhKL.csv -k phpModel.txt
+	./gert -f phpData.txt -s phpModel.txt
+	./gert -f phpData.txt -k phpModel.txt
 
 testStates: gert
 	./gert -f alt.txt -s altModel.txt
 	./gert -f alt.txt -k altModel.txt
 
 testBasketball: gert
-	./gert -f basketball.csv -s bball.txt
-	./gert -f basketball.csv -k bball.txt
+	./gert -f bballData.txt -s bballModel.txt
+	./gert -f bballData.txt -k bballModel.txt
 
 testKC1: gert
 	./gert -f kc1.csv -s kc1Model.txt
@@ -50,6 +50,6 @@ testFake: gert
 	./gert -f bigData.txt -s bigDataModel.txt
 	./gert -f bigData.txt -k bigDataModel.txt
 
-testCircle: gert
+testPoly: gert
 	./gert -f circleData.txt -t 1 -d 2 -g 1 -s circleModel.txt
 	./gert -f circleData.txt -k circleModel.txt -t 1 -d 2 -g 1

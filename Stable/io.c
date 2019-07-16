@@ -2,6 +2,10 @@
 
 void read_file(char* filename, struct denseData* ds){
   FILE *fp = fopen(filename, "r");
+  if (fp == NULL){
+    fprintf(stderr, "gert: io.c: read_file() - file %s not found\n",filename );
+    exit(1);
+  }
   count_entries(fp, ds);
 
   ds->data1d = (double*)malloc(sizeof(double)*ds->nInstances*ds->nFeatures);
