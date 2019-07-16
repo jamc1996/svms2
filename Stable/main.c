@@ -4,6 +4,7 @@
 #include "subproblem.h"
 #include "kernels.h"
 
+#include <sys/time.h>
 #include <stdio.h>
 
 #define RED   "\x1B[31m"
@@ -21,6 +22,12 @@ int main(int argc, char *argv[]) {
   struct denseData ds;
   struct Fullproblem fp;
   struct Projected sp;
+
+  struct timeval start, trainStart, trainEnd, end;
+
+
+  gettimeofday(&start, 0);
+
 
   // Input processed:
   parse_arguments(argc, argv, &filename, &parameters);
@@ -52,6 +59,7 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
+  gettimeofday(&trainStart, 0);
   // Full problem allocated and filled in, all alpha = 0.0 all gradF = 1.0:
   alloc_prob(&fp, &ds, p);
   init_prob(&fp, &ds);
@@ -163,12 +171,21 @@ int main(int argc, char *argv[]) {
       break;
     }
   }
-
+  gettimeofday(&trainEnd, 0);
 
 
   if (parameters.save) {
     saveTrainedModel(&fp, &ds, parameters.savename, &parameters);
   }
+
+  gettimeofday(&end, 0);
+
+  long totalelapsed = (end.tv_sec-start.tv_sec)*1000000 + end.tv_usec-start.tv_usec;
+  long trainelapsed = (trainEnd.tv_sec-trainStart.tv_sec)*1000000 + trainEnd.tv_usec-trainStart.tv_usec;
+
+  printf("Training Complete\n" );
+  printf("Total Time spent: %ld micro seconds\n",totalelapsed );
+  printf("Time spent training: %ld micro seconds\n",trainelapsed );
 
   //Memory freed
   freeDenseData(&ds);
