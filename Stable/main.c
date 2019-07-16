@@ -37,24 +37,24 @@ int main(int argc, char *argv[]) {
   //
 
 
-  double* bigH = malloc(sizeof(double)*ds.nInstances*ds.nInstances);
-  double** fullBigH = malloc(sizeof(double*)*ds.nInstances);
-  double Hx, Hy;
-  for (int i = 0; i < ds.nInstances; i++) {
-    fullBigH[i] = &bigH[i*ds.nInstances];
-    for (int j = 0; j < ds.nInstances; j++) {
-      Hy = 0.0;
-      for (int k = 0; k < ds.nFeatures; k++) {
-        Hx = (ds.data[i][k]-ds.data[j][k]);
-        Hy -= Hx*Hx;
-      }
-      Hy *= parameters.Gamma;
-      fullBigH[i][j] = exp(Hy)*ds.y[j]*ds.y[i];
-    }
-  }
-  double* check = malloc(sizeof(double)*ds.nInstances);
+  // double* bigH = malloc(sizeof(double)*ds.nInstances*ds.nInstances);
+  // double** fullBigH = malloc(sizeof(double*)*ds.nInstances);
+  // double Hx, Hy;
+  // for (int i = 0; i < ds.nInstances; i++) {
+  //   fullBigH[i] = &bigH[i*ds.nInstances];
+  //   for (int j = 0; j < ds.nInstances; j++) {
+  //     Hy = 0.0;
+  //     for (int k = 0; k < ds.nFeatures; k++) {
+  //       Hx = (ds.data[i][k]-ds.data[j][k]);
+  //       Hy -= Hx*Hx;
+  //     }
+  //     Hy *= parameters.Gamma;
+  //     fullBigH[i][j] = exp(Hy)*ds.y[j]*ds.y[i];
+  //   }
+  // }
+  // double* check = malloc(sizeof(double)*ds.nInstances);
 
-  printf("%lf\n",fullBigH[1][2] );
+
 
 
   //cleanData(&ds);
@@ -121,20 +121,20 @@ int main(int argc, char *argv[]) {
     // }
     // printf("\n" );
 
-    for (int i = 0; i < fp.n; i++) {
-      check[i] = 1.0;
-      for (int j = 0; j < fp.n; j++) {
-        check[i] -= fullBigH[i][j]*fp.alpha[j];
-      }
-    }
-    for (int i = 0; i < fp.n; i++) {
-      if (fabs(fp.gradF[i] - check[i]) > 0.00001 ) {
-        printf("n is %d i is %d\n",fp.n,i );
-
-        printf("here %lf aaand %lf\n",fp.gradF[i], check[i] );
-        exit(22);
-      }
-    }
+    // for (int i = 0; i < fp.n; i++) {
+    //   check[i] = 1.0;
+    //   for (int j = 0; j < fp.n; j++) {
+    //     check[i] -= fullBigH[i][j]*fp.alpha[j];
+    //   }
+    // }
+    // for (int i = 0; i < fp.n; i++) {
+    //   if (fabs(fp.gradF[i] - check[i]) > 0.00001 ) {
+    //     printf("n is %d i is %d\n",fp.n,i );
+    //
+    //     printf("here %lf aaand %lf\n",fp.gradF[i], check[i] );
+    //     exit(22);
+    //   }
+    // }
 
     //if (n < -fp.p) {
     //  printf("%lf\n",fp.alpha[(n+fp.p+fp.p)%fp.p] );
@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
 
 
     if (n==0) {
-      printf("Converged! (itt = %d)\n", itt );
+      printf("Converged! (itt = %d) %d\n", itt, fp.p );
 
       int add = 2;
       int *temp = malloc(sizeof(int)*add);
