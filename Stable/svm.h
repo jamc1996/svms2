@@ -7,7 +7,6 @@
 
 struct svm_args
 {
-	int type;
 	int kernel;
 	int degree;
 	double C;	/* for C_SVC, EPSILON_SVR and NU_SVR */

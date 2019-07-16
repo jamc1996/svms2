@@ -7,7 +7,7 @@ void alloc_prob(struct Fullproblem *prob, struct denseData *ds, int p)
   prob->n = ds->nInstances;
   prob->p = p;
   prob->q = prob->n-prob->p;
-  prob->C = 50.0;
+  prob->C = 100.0;
   prob->alpha = (double*)calloc(prob->n, sizeof(double) );
   prob->gradF = (double*)malloc(sizeof(double)*prob->n);
   prob->active = (int*)malloc(sizeof(int)*prob->p);
@@ -511,9 +511,7 @@ int findWorstest(struct Fullproblem *fp , int add, int* temp, int* temp2)
       }
     }
   }
-  for (int i = 0; i < add; i++) {
-    printf("beta %lf\n",betaVal[i] );
-  }
+
 
   for (int i = 0; i < add; i++) {
     if (betaVal[i] > 0) {
@@ -521,9 +519,6 @@ int findWorstest(struct Fullproblem *fp , int add, int* temp, int* temp2)
     }
   }
 
-  for (int i = 0; i < add; i++) {
-    printf("post beta %lf\n",betaVal[i] );
-  }
   int flag;
   int k = 0;
   for (int i = 0; i < add; i++) {

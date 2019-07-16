@@ -104,8 +104,11 @@ void count_entries(FILE *input, struct denseData* ds)
   rewind(input);
 }
 
-void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filename){
+void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filename, struct svm_args *params)
+{
   FILE *file = fopen(filename, "w");
+  fprintf(file, "%d\n",params->kernel );
+
   fprintf(file, "%d\n",ds->nFeatures );
 
   int count = 0;
@@ -124,90 +127,186 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
   }
   double *h = malloc(sizeof(double)*fp->n*count);
   double **H = malloc(sizeof(double*)*fp->n);
+  int r = -1;
+
   for (int i = 0; i < fp->n; i++) {
     H[i] = &h[i*count];
   }
 
-  for (int i = 0; i < fp->n; i++) {
-    for (int j = 0; j < count; j++) {
-      H[i][j] = 0.0;
-      for (int k = 0; k < ds->nFeatures; k++) {
-        H[i][j] += ds->data[i][k]*ds->data[active[j]][k];
+  if (params->kernel == LINEAR) {
+    for (int i = 0; i < fp->n; i++) {
+      for (int j = 0; j < count; j++) {
+        H[i][j] = 0.0;
+        for (int k = 0; k < ds->nFeatures; k++) {
+          H[i][j] += ds->data[i][k]*ds->data[active[j]][k];
+        }
+        H[i][j] *= ds->y[active[j]]*ds->y[i];
       }
-      H[i][j] *= ds->y[active[j]]*ds->y[i];
     }
-  }
-  int r = -1;
-  for (int i = 0; i < count; i++) {
-    if (fp->alpha[active[i]] < fp->C*0.99) {
-      r = active[i];
-      break;
+    for (int i = 0; i < count; i++) {
+      if (fp->alpha[active[i]] < fp->C*0.99) {
+        r = active[i];
+        break;
+      }
     }
-  }
-  if (r<0) {
-    exit(77);
-  }
-
-  double b = 1.0;
-  for (int i = 0; i < count; i++) {
-    b -= H[r][i]*fp->alpha[active[i]];
-  }
-  b *= ds->y[r];
-
-  double *w = malloc(sizeof(double)*ds->nFeatures);
-  for (int i = 0; i < ds->nFeatures; i++) {
-    w[i] = 0.0;
-    for (int j = 0; j < count; j++) {
-      w[i] += fp->alpha[active[j]]*ds->data[active[j]][i]*ds->y[active[j]];
+    if (r<0) {
+      exit(77);
     }
+    double b = 1.0;
+    for (int i = 0; i < count; i++) {
+      b -= H[r][i]*fp->alpha[active[i]];
+    }
+    b *= ds->y[r];
+
+    double *w = malloc(sizeof(double)*ds->nFeatures);
+
+    for (int i = 0; i < ds->nFeatures; i++) {
+      w[i] = 0.0;
+      for (int j = 0; j < count; j++) {
+        w[i] += fp->alpha[active[j]]*ds->data[active[j]][i]*ds->y[active[j]];
+      }
+    }
+
+
+
+    fprintf(file, "%lf\n",b );
+    for (int i = 0; i < ds->nFeatures; i++) {
+      fprintf(file, "%lf\n",w[i] );
+    }
+    free(w);
+
+  }
+  else if(params->kernel == POLYNOMIAL){
+    fprintf(file, "%d\n", count );
+    for (int i = 0; i < fp->n; i++) {
+      for (int j = 0; j < count; j++) {
+        H[i][j] = 0.0;
+        for (int k = 0; k < ds->nFeatures; k++) {
+          H[i][j] += ds->data[i][k]*ds->data[active[j]][k];
+        }
+        H[i][j] = pow(H[i][j]+params->Gamma, params->degree);
+        H[i][j] *= ds->y[active[j]]*ds->y[i];
+      }
+    }
+    for (int i = 0; i < count; i++) {
+      if (fp->alpha[active[i]] < fp->C*0.99) {
+        r = active[i];
+        break;
+      }
+    }
+    if (r<0) {
+      exit(77);
+    }
+
+    double b = 1.0;
+
+    for (int i = 0; i < count; i++) {
+      b -= H[r][i]*fp->alpha[active[i]];
+    }
+    b *= ds->y[r];
+    fprintf(file, "%lf\n",b );
+
+    for (int i = 0; i < count; i++) {
+      for (int j = 0; j < ds->nFeatures; j++) {
+        fprintf(file, "%lf\n",ds->data[active[i]][j] );
+      }
+    }
+
+    for (int i = 0; i < count; i++) {
+      fprintf(file, "%lf\n",fp->alpha[active[i]]*ds->y[active[i]] );
+    }
+
   }
 
-
-
-  fprintf(file, "%lf\n",b );
-  for (int i = 0; i < ds->nFeatures; i++) {
-    fprintf(file, "%lf\n",w[i] );
-  }
   free(active);
   free(h);
   free(H);
-  free(w);
   fclose(file);
 }
 
-void testSavedModel(struct denseData *ds, char* fn)
+void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params)
 {
   FILE *fp = fopen(fn, "r");
   int k;
   double b;
-  int res = fscanf(fp, "%d",&k);
-  if (res == EOF) {
-    exit(2222);
-  }
-  res = fscanf(fp, "%lf", &b);
-  double *w = malloc(sizeof(double)*k);
-  for (size_t i = 0; i < k; i++) {
-    res = fscanf(fp, "%lf",&w[i]);
+  int kernel;
+
+  int res = fscanf(fp, "%d",&kernel);
+  res = fscanf(fp, "%d",&k);
+
+  if (k!= ds->nFeatures) {
+    fprintf(stderr, "io.c: \n" );
+    exit(1);
   }
   int wrong = 0;
-  for (int i = 0; i < ds->nInstances; i++) {
-    double res = b;
-    for (int j = 0; j < ds->nFeatures; j++) {
-      res += w[j]*ds->data[i][j];
+
+  if (kernel == LINEAR) {
+    res = fscanf(fp, "%lf", &b);
+
+    double *w = malloc(sizeof(double)*k);
+    for (size_t i = 0; i < k; i++) {
+      res = fscanf(fp, "%lf",&w[i]);
     }
-    if (ds->y[i]*res < 0.0) {
-      printf("%sres[%d] = %.3lf%s\n",RED,i,res,RESET );
-      wrong++;
+    double value;
+    for (int i = 0; i < ds->nInstances; i++) {
+      value = b;
+      for (int j = 0; j < ds->nFeatures; j++) {
+        value += w[j]*ds->data[i][j];
+      }
+      if (ds->y[i]*value < 0.0) {
+        printf("%sres[%d] = %.3lf%s\n",RED,i,value,RESET );
+        wrong++;
+      }
+      else{
+        printf("%sres[%d] = %.3lf%s\n",GRN,i,value,RESET );
+      }
     }
-    else{
-      printf("%sres[%d] = %.3lf%s\n",GRN,i,res,RESET );
+    free(w);
+  }
+  else if(params->kernel == POLYNOMIAL)  {
+    int count;
+    res = fscanf(fp, "%d", &count);
+    res = fscanf(fp, "%lf", &b);
+    double value;
+    double *alphaY = malloc(sizeof(double)*count);
+    double *x = malloc(sizeof(double)*count*k);
+    double **X = malloc(sizeof(double*)*count);
+    for (int i = 0; i < count; i++) {
+      X[i] = &x[i*k];
+    }
+    for (int i = 0; i < count; i++) {
+      for (int j = 0; j < k; j++) {
+        res = fscanf(fp, "%lf", &X[i][j]);
+      }
+    }
+    for (int i = 0; i < count; i++) {
+      res = fscanf(fp, "%lf", &alphaY[i]);
+    }
+    double contrib = 0;
+    for (int i = 0; i < ds->nInstances; i++) {
+      value = b;
+      for (int j = 0; j < count; j++) {
+        contrib = 0;
+        for (int k = 0; k < ds->nFeatures; k++) {
+          contrib += X[j][k]*ds->data[i][k];
+        }
+        contrib = pow(contrib + params->Gamma, params->degree);
+        value += alphaY[j]*contrib;
+      }
+      if (ds->y[i]*value < 0.0) {
+        printf("%sres[%d] = %.3lf%s\n",RED,i,value,RESET );
+        wrong++;
+      }
+      else{
+        printf("%sres[%d] = %.3lf%s\n",GRN,i,value,RESET );
+      }
     }
   }
+
   int right = ds->nInstances - wrong;
   double pct = 100.0*((double)right/(double)ds->nInstances);
   printf("%d correct classifications out of %d. %.2lf%% correct.\n",right,ds->nInstances,pct );
 
-  free(w);
   fclose(fp);
 
 }
@@ -241,8 +340,7 @@ int parse_arguments(int argc, char *argv[], char** filename, struct svm_args *pa
   int c;
 
   // Default values set:
-  parameters->type = 0;
-  parameters->kernel = 1;
+  parameters->kernel = 0;
   parameters->degree = 1;
   parameters->verbose = 0;
   parameters->C = 1;
@@ -257,7 +355,7 @@ int parse_arguments(int argc, char *argv[], char** filename, struct svm_args *pa
         *filename = optarg;
         break;
       case 't':
-        parameters->type = atoi(optarg);
+        parameters->kernel = atoi(optarg);
         break;
       case 'c':
         parameters->C = atof(optarg);

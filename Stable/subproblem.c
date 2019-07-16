@@ -6,7 +6,7 @@ void alloc_subprob(struct Projected *sp, int p)
  */
 {
   sp->p = p;
-  sp->C = 50.0;
+  sp->C = 100.0;
 
   sp->alphaHat = malloc(sizeof(double)*p);
   sp->yHat = malloc(sizeof(double)*p);
@@ -55,10 +55,10 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
   double newRSQ;
   int problem = 0;
 
-  int john = 0;;
+  int its = 0;;
   while (rSq > 0.000000001) {
-    john++;
-    if(john % 1000 == 0){
+    its++;
+    if(its % 1000 == 0){
       printf("rSq is %lf\n",rSq );
     }
     calc_Hrho(sp);

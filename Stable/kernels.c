@@ -5,7 +5,7 @@ int setH(struct Fullproblem *prob, struct denseData *ds, struct svm_args *params
 /*  Function to update the values of the matrix partialH
  *  TO DO -> ALLOW ONLY UPDATE THE SWAPPED OUT VALUES - or not?   */
 {
-  if (params->type == LINEAR) {
+  if (params->kernel == LINEAR) {
     for (int i = 0; i < prob->q; i++) {
       for (int j = 0; j < prob->p; j++) {
         prob->partialH[i][j] = 0.0;
@@ -16,7 +16,7 @@ int setH(struct Fullproblem *prob, struct denseData *ds, struct svm_args *params
       }
     }
   }
-  else if (params->type == POLYNOMIAL) {
+  else if (params->kernel == POLYNOMIAL) {
     for (int i = 0; i < prob->q; i++) {
       for (int j = 0; j < prob->p; j++) {
         prob->partialH[i][j] = 0.0;
@@ -28,7 +28,7 @@ int setH(struct Fullproblem *prob, struct denseData *ds, struct svm_args *params
       }
     }
   }
-  else if (params->type == EXPONENTIAL) {
+  else if (params->kernel == EXPONENTIAL) {
     double x;
     double y;
     for (int i = 0; i < prob->q; i++) {
@@ -51,7 +51,7 @@ int setH(struct Fullproblem *prob, struct denseData *ds, struct svm_args *params
 
 int updateSubH(struct Fullproblem *fp, struct Projected *sp, struct denseData *ds, struct svm_args *params)
 {
-  if (params->type == LINEAR) {
+  if (params->kernel == LINEAR) {
     for (int i = 0; i < sp->p; i++) {
       for (int j = i; j < sp->p; j++) {
         sp->H[i][j] = 0.0;
@@ -62,7 +62,7 @@ int updateSubH(struct Fullproblem *fp, struct Projected *sp, struct denseData *d
       }
     }
   }
-  else if (params->type == POLYNOMIAL) {
+  else if (params->kernel == POLYNOMIAL) {
     for (int i = 0; i < fp->p; i++) {
       for (int j = i; j < fp->p; j++) {
         sp->H[i][j] = 0.0;
@@ -74,7 +74,7 @@ int updateSubH(struct Fullproblem *fp, struct Projected *sp, struct denseData *d
       }
     }
   }
-  else if (params->type == EXPONENTIAL) {
+  else if (params->kernel == EXPONENTIAL) {
     double x;
     double y;
     for (int i = 0; i < fp->p; i++) {
@@ -98,7 +98,7 @@ int updateSubH(struct Fullproblem *fp, struct Projected *sp, struct denseData *d
 
 void partialHupdate(struct Fullproblem *fp, struct Projected *sp, struct denseData *ds, struct svm_args *params, int n, int worst)
 {
-  if (params->type == LINEAR) {
+  if (params->kernel == LINEAR) {
     for (int j = 0; j < fp->q; j++) {
       if (j == worst) {
         for (int k = 0; k < n; k++) {
@@ -137,7 +137,7 @@ void partialHupdate(struct Fullproblem *fp, struct Projected *sp, struct denseDa
       sp->H[n][i]*=ds->y[fp->inactive[worst]]*ds->y[fp->active[i]];
     }
   }
-  else if (params->type == POLYNOMIAL) {
+  else if (params->kernel == POLYNOMIAL) {
     for (int j = 0; j < fp->q; j++) {
       if (j == worst) {
         for (int k = 0; k < n; k++) {
@@ -180,7 +180,7 @@ void partialHupdate(struct Fullproblem *fp, struct Projected *sp, struct denseDa
       sp->H[n][i]*=ds->y[fp->inactive[worst]]*ds->y[fp->active[i]];
     }
   }
-  else if (params->type == EXPONENTIAL) {
+  else if (params->kernel == EXPONENTIAL) {
     double x,y;
     for (int j = 0; j < fp->q; j++) {
       if (j == worst) {

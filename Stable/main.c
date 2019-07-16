@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
   // Projected problem size chosen temporarily
   int p = 4;
   if(parameters.test){
-    testSavedModel(&ds, parameters.modelfile);
+    testSavedModel(&ds, parameters.modelfile, &parameters);
     return 0;
   }
 
@@ -90,21 +90,22 @@ int main(int argc, char *argv[]) {
     {
       //exit(78);
     }
-int john = (n+sp.p+sp.p)%sp.p;
     updateAlphaR(&fp, &sp);
     calcYTR(&sp, &fp);
     calculateBeta(&fp, &sp, &ds);
     for (int i = 0; i < fp.q; i++) {
       if (fp.beta[i] < 0) {
-        printf("beta[%d] == %lf (%d) (%lf)\n",i,fp.beta[i],fp.inactive[i],fp.alpha[fp.inactive[i]]);
+//        printf("beta[%d] == %lf (%d) (%lf)\n",i,fp.beta[i],fp.inactive[i],fp.alpha[fp.inactive[i]]);
       }
     }
-    printf("%lf\n",sp.ytr );
-    printf("%d and %lf\n",john,fp.alpha[fp.active[john]] );
-    for (int i = 0; i < fp.p; i++) {
-      printf("activ %d\n",fp.active[i] );
-    }
-    printf("\n" );
+//    int john = (n+sp.p+sp.p)%sp.p;
+
+    // printf("%lf\n",sp.ytr );
+    // printf("%d and %lf\n",john,fp.alpha[fp.active[john]] );
+    // for (int i = 0; i < fp.p; i++) {
+    //   printf("activ %d\n",fp.active[i] );
+    // }
+    // printf("\n" );
 
     // for (int i = 0; i < fp.n; i++) {
     //   check[i] = 1.0;
@@ -128,9 +129,7 @@ int john = (n+sp.p+sp.p)%sp.p;
 
     if (n==0) {
       printf("Converged! (itt = %d)\n", itt );
-      for (int i = 0; i < fp.n; i++) {
-        printf("alpha[%d] = %lf\n",i,fp.alpha[i] );
-      }
+
       int add = 2;
       int *temp = malloc(sizeof(int)*add);
       int *temp2 = malloc(sizeof(int)*add);
@@ -168,7 +167,7 @@ int john = (n+sp.p+sp.p)%sp.p;
 
 
   if (parameters.save) {
-    saveTrainedModel(&fp, &ds, parameters.savename);
+    saveTrainedModel(&fp, &ds, parameters.savename, &parameters);
   }
 
   //Memory freed

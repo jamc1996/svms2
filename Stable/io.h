@@ -19,8 +19,8 @@
 #define WHT   "\x1B[37m"
 #define RESET "\x1B[0m"
 
-void testSavedModel(struct denseData *ds, char* fn);
-void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filename);
+void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params);
+void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filename, struct svm_args *params);
 void read_file(char* const filename, struct denseData* ds);
 int readline(FILE *input, char **line);
 void count_entries(FILE *input, struct denseData* ds);
