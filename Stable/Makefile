@@ -32,24 +32,28 @@ test: testPHP testStates testBasketball testPoly
 
 testPHP: gert
 	./gert -f phpData.txt -s phpModel.txt
-	./gert -f phpData.txt -k phpModel.txt
+	./gert -f phpData.txt -t phpModel.txt
 
 testStates: gert
 	./gert -f alt.txt -s altModel.txt
-	./gert -f alt.txt -k altModel.txt
+	./gert -f alt.txt -t altModel.txt
 
 testBasketball: gert
 	./gert -f bballData.txt -s bballModel.txt
-	./gert -f bballData.txt -k bballModel.txt
+	./gert -f bballData.txt -t bballModel.txt
 
 testKC1: gert
 	./gert -f kc1.csv -s kc1Model.txt
-	./gert -f kc1.csv -k kc1Model.txt
+	./gert -f kc1.csv -t kc1Model.txt
 
 testFake: gert
 	./gert -f bigData.txt -s bigDataModel.txt
-	./gert -f bigData.txt -k bigDataModel.txt
+	./gert -f bigData.txt -t bigDataModel.txt
 
 testPoly: gert
-	./gert -f circleData.txt -t 1 -d 2 -g 1 -s circleModel.txt
-	./gert -f circleData.txt -k circleModel.txt -t 1 -d 2 -g 1
+	./gert -f circleData.txt -k 1 -d 2 -g 1 -s circleModel.txt
+	./gert -f circleData.txt -t circleModel.txt -k 1 -d 2 -g 1
+
+testExp: gert
+	./gert -f circleData.txt -k 2 -d 2 -g 1 -s expModel.txt
+	./gert -f circleData.txt -t expModel.txt -k 2 -d 2 -g 1

@@ -6,6 +6,7 @@
 
 #include <sys/time.h>
 #include <stdio.h>
+#include <math.h>
 
 #define RED   "\x1B[31m"
 #define GRN   "\x1B[32m"
@@ -34,20 +35,26 @@ int main(int argc, char *argv[]) {
   read_file(filename, &ds);
   //preprocess(&ds);
   //
-  // double* bigH = malloc(sizeof(double)*ds.nInstances*ds.nInstances);
-  // double** fullBigH = malloc(sizeof(double*)*ds.nInstances);
-  // for (int i = 0; i < ds.nInstances; i++) {
-  //   fullBigH[i] = &bigH[i*ds.nInstances];
-  //   for (int j = 0; j < ds.nInstances; j++) {
-  //     fullBigH[i][j] = 0.0;
-  //     for (int k = 0; k < ds.nFeatures; k++) {
-  //       fullBigH[i][j] += ds.data[i][k]*ds.data[j][k];
-  //     }
-  //     fullBigH[i][j] = pow(fullBigH[i][j]+parameters.Gamma, parameters.degree);
-  //     fullBigH[i][j] *= ds.y[j]*ds.y[i];
-  //   }
-  // }
-  // double* check = malloc(sizeof(double)*ds.nInstances);
+
+
+  double* bigH = malloc(sizeof(double)*ds.nInstances*ds.nInstances);
+  double** fullBigH = malloc(sizeof(double*)*ds.nInstances);
+  double Hx, Hy;
+  for (int i = 0; i < ds.nInstances; i++) {
+    fullBigH[i] = &bigH[i*ds.nInstances];
+    for (int j = 0; j < ds.nInstances; j++) {
+      Hy = 0.0;
+      for (int k = 0; k < ds.nFeatures; k++) {
+        Hx = (ds.data[i][k]-ds.data[j][k]);
+        Hy -= Hx*Hx;
+      }
+      Hy *= parameters.Gamma;
+      fullBigH[i][j] = exp(Hy)*ds.y[j]*ds.y[i];
+    }
+  }
+  double* check = malloc(sizeof(double)*ds.nInstances);
+
+  printf("%lf\n",fullBigH[1][2] );
 
 
   //cleanData(&ds);
@@ -63,7 +70,6 @@ int main(int argc, char *argv[]) {
   // Full problem allocated and filled in, all alpha = 0.0 all gradF = 1.0:
   alloc_prob(&fp, &ds, p);
   init_prob(&fp, &ds);
-
 
 
   // Subproblem allocated:
@@ -115,20 +121,20 @@ int main(int argc, char *argv[]) {
     // }
     // printf("\n" );
 
-    // for (int i = 0; i < fp.n; i++) {
-    //   check[i] = 1.0;
-    //   for (int j = 0; j < fp.n; j++) {
-    //     check[i] -= fullBigH[i][j]*fp.alpha[j];
-    //   }
-    // }
-    // for (int i = 0; i < fp.n; i++) {
-    //   if (fabs(fp.gradF[i] - check[i]) > 0.00001 ) {
-    //     printf("n is %d i is %d\n",fp.n,i );
-    //
-    //     printf("here %lf\n",fabs(fp.gradF[i] - check[i]) );
-    //     exit(22);
-    //   }
-    // }
+    for (int i = 0; i < fp.n; i++) {
+      check[i] = 1.0;
+      for (int j = 0; j < fp.n; j++) {
+        check[i] -= fullBigH[i][j]*fp.alpha[j];
+      }
+    }
+    for (int i = 0; i < fp.n; i++) {
+      if (fabs(fp.gradF[i] - check[i]) > 0.00001 ) {
+        printf("n is %d i is %d\n",fp.n,i );
+
+        printf("here %lf aaand %lf\n",fp.gradF[i], check[i] );
+        exit(22);
+      }
+    }
 
     //if (n < -fp.p) {
     //  printf("%lf\n",fp.alpha[(n+fp.p+fp.p)%fp.p] );
@@ -172,6 +178,7 @@ int main(int argc, char *argv[]) {
     }
   }
   gettimeofday(&trainEnd, 0);
+
 
 
   if (parameters.save) {

@@ -121,7 +121,7 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
       count++;
     }
   }
-  int * active = malloc(sizeof(int)*count);
+  int *active = malloc(sizeof(int)*count);
   int j = 0;
   for (int i = 0; i < fp->n; i++) {
     if (fp->alpha[i] > 0.0) {
@@ -219,7 +219,49 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
     for (int i = 0; i < count; i++) {
       fprintf(file, "%lf\n",fp->alpha[active[i]]*ds->y[active[i]] );
     }
+  }
+  else if(params->kernel == EXPONENTIAL)
+  {
+    fprintf(file, "%d\n", count );
+    double x,y;
+    for (int i = 0; i < fp->n; i++) {
+      for (int j = 0; j < count; j++) {
+        y = 0.0;
+        for (int k = 0; k < ds->nFeatures; k++) {
+          x = ds->data[i][k] - ds->data[active[j]][k];
+          y -= x*x;
+        }
+        y *= params->Gamma;
+        H[i][j] = exp(y)*ds->y[active[j]]*ds->y[i];
+      }
+    }
+    for (int i = 0; i < count; i++) {
+      if (fp->alpha[active[i]] < fp->C*0.99) {
+        r = active[i];
+        break;
+      }
+    }
+    if (r<0) {
+      exit(77);
+    }
 
+    double b = 1.0;
+
+    for (int i = 0; i < count; i++) {
+      b -= H[r][i]*fp->alpha[active[i]];
+    }
+    b *= ds->y[r];
+    fprintf(file, "%lf\n",b );
+
+    for (int i = 0; i < count; i++) {
+      for (int j = 0; j < ds->nFeatures; j++) {
+        fprintf(file, "%lf\n",ds->data[active[i]][j] );
+      }
+    }
+
+    for (int i = 0; i < count; i++) {
+      fprintf(file, "%lf\n",fp->alpha[active[i]]*ds->y[active[i]] );
+    }
   }
 
   free(active);
@@ -306,6 +348,47 @@ void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params)
       }
     }
   }
+  else if(params->kernel == EXPONENTIAL)  {
+    int count;
+    res = fscanf(fp, "%d", &count);
+    res = fscanf(fp, "%lf", &b);
+    double value;
+    double *alphaY = malloc(sizeof(double)*count);
+    double *x = malloc(sizeof(double)*count*k);
+    double **X = malloc(sizeof(double*)*count);
+    for (int i = 0; i < count; i++) {
+      X[i] = &x[i*k];
+    }
+    for (int i = 0; i < count; i++) {
+      for (int j = 0; j < k; j++) {
+        res = fscanf(fp, "%lf", &X[i][j]);
+      }
+    }
+    for (int i = 0; i < count; i++) {
+      res = fscanf(fp, "%lf", &alphaY[i]);
+    }
+    double contrib = 0;
+    double y;
+    for (int i = 0; i < ds->nInstances; i++) {
+      value = b;
+      for (int j = 0; j < count; j++) {
+        contrib = 0;
+        for (int k = 0; k < ds->nFeatures; k++) {
+          y = X[j][k] - ds->data[i][k];
+          contrib -= y*y;
+        }
+        contrib *= params->Gamma;
+        value += alphaY[j]*exp(contrib);
+      }
+      if (ds->y[i]*value < 0.0) {
+        printf("%sres[%d] = %.3lf%s\n",RED,i,value,RESET );
+        wrong++;
+      }
+      else{
+        printf("%sres[%d] = %.3lf%s\n",GRN,i,value,RESET );
+      }
+    }
+  }
 
   int right = ds->nInstances - wrong;
   double pct = 100.0*((double)right/(double)ds->nInstances);
@@ -358,13 +441,13 @@ int parse_arguments(int argc, char *argv[], char** filename, struct svm_args *pa
       case 'f':
         *filename = optarg;
         break;
-      case 't':
+      case 'k':
         parameters->kernel = atoi(optarg);
         break;
       case 'c':
         parameters->C = atof(optarg);
         break;
-      case 'k':
+      case 't':
         parameters->test = 1;
         parameters->modelfile = optarg;
         break;

@@ -39,7 +39,7 @@ int setH(struct Fullproblem *prob, struct denseData *ds, struct svm_args *params
           y -= x*x;
         }
         y *= params->Gamma;
-        prob->partialH[i][j] = -exp(y)*ds->y[prob->inactive[i]]*ds->y[prob->active[j]];
+        prob->partialH[i][j] = exp(y)*ds->y[prob->inactive[i]]*ds->y[prob->active[j]];
       }
     }
   }
@@ -78,14 +78,14 @@ int updateSubH(struct Fullproblem *fp, struct Projected *sp, struct denseData *d
     double x;
     double y;
     for (int i = 0; i < fp->p; i++) {
-      for (int j = 0; j < fp->p; j++) {
+      for (int j = i; j < fp->p; j++) {
         y = 0.0;
         for (int k = 0; k < ds->nFeatures; k++) {
           x = (ds->data[fp->active[i]][k]- ds->data[fp->active[j]][k]);
           y -= x*x;
         }
-        y /= (params->Gamma*2.0);
-        sp->H[i][j] = -exp(y)*ds->y[fp->active[i]]*ds->y[fp->active[j]];
+        y *= params->Gamma;
+        sp->H[i][j] = exp(y)*ds->y[fp->active[i]]*ds->y[fp->active[j]];
       }
     }
   }
@@ -115,7 +115,6 @@ void partialHupdate(struct Fullproblem *fp, struct Projected *sp, struct denseDa
       }
       fp->partialH[j][n]*=ds->y[fp->inactive[worst]]*ds->y[fp->inactive[j]];
     }
-
     for (int i = 0; i < n; i++) {
       sp->H[i][n] = 0.0;
       for (int k = 0; k < ds->nFeatures; k++) {
@@ -198,7 +197,7 @@ void partialHupdate(struct Fullproblem *fp, struct Projected *sp, struct denseDa
         y -= x*x;
       }
       y *= (params->Gamma);
-      fp->partialH[j][n] = -exp(y)*ds->y[fp->inactive[worst]]*ds->y[fp->inactive[j]];
+      fp->partialH[j][n] = exp(y)*ds->y[fp->inactive[worst]]*ds->y[fp->inactive[j]];
     }
 
     for (int i = 0; i < n; i++) {
@@ -208,7 +207,7 @@ void partialHupdate(struct Fullproblem *fp, struct Projected *sp, struct denseDa
         y -= x*x;
       }
       y *= (params->Gamma);
-      sp->H[i][n] = -exp(y)*ds->y[fp->inactive[worst]]*ds->y[fp->active[i]];
+      sp->H[i][n] = exp(y)*ds->y[fp->inactive[worst]]*ds->y[fp->active[i]];
     }
 
     y = 0.0;
@@ -217,7 +216,7 @@ void partialHupdate(struct Fullproblem *fp, struct Projected *sp, struct denseDa
       y -= x*x;
     }
     y *= params->Gamma;
-    sp->H[n][n] = -exp(y);
+    sp->H[n][n] = exp(y);
 
     for (int i = n+1; i < sp->p; i++) {
       y = 0.0;
@@ -226,7 +225,7 @@ void partialHupdate(struct Fullproblem *fp, struct Projected *sp, struct denseDa
         y += x*x;
       }
       y *= params->Gamma;
-      sp->H[n][i] = -exp(y)*ds->y[fp->inactive[worst]]*ds->y[fp->active[i]];
+      sp->H[n][i] = exp(y)*ds->y[fp->inactive[worst]]*ds->y[fp->active[i]];
     }
 
   }
