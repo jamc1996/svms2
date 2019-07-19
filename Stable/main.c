@@ -18,7 +18,7 @@
 #define RESET "\x1B[0m"
 
 int main(int argc, char *argv[]) {
-  printf("check it\n", );
+  printf("check it\n" );
   char* filename = NULL;
   struct svm_args parameters;
   struct denseData ds;
