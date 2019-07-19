@@ -52,7 +52,8 @@ void read_file(char* filename, struct denseData* ds){
       ds->y[r] = 1;
 
       r++;
-    }else if (atoi(p) == -1){
+    }
+    else if (atoi(p) == -1){
       for (int j = 0; j < ds->nFeatures; j++) {
         ds->data[ds->nPos+q][j] = temp[j];
       }
@@ -74,7 +75,7 @@ void count_entries(FILE *input, struct denseData* ds)
   ds->nNeg = 0;
   char* line = NULL;
 
-
+  int counter = 0;
   // Find size of dataset:
   while (readline(input, &line)) {
     if (ds->nFeatures==-1) {
@@ -93,13 +94,15 @@ void count_entries(FILE *input, struct denseData* ds)
     for (int i = 0; i < ds->nFeatures+1; i++) {
       p = strtok(NULL, " \t");
     }
+    printf("p = %s\n",p );
+    counter++;
     int num = atoi(p);
     if (num == 1) {
       ds->nPos++;
     }else if(num == -1){
       ds->nNeg++;
     }else{
-      fprintf(stderr, "invalid classes (should be 1 or -1)\n");
+      fprintf(stderr, "invalid classes (should be 1 or -1, %d found %d)\n",num,counter);
       exit(1);
     }
     ds->nInstances++;

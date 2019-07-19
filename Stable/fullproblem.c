@@ -28,11 +28,9 @@ void init_prob(struct Fullproblem *prob, struct denseData *ds)
   for (int i = 0; i < prob->n; i++) {
     prob->gradF[i] = 1.0;
   }
-
   for (int i = 0; i < prob->p/2; i++) {
     prob->active[i] = i;
   }
-
   for (int i = 0; i < prob->p/2; i++) {
     prob->active[i+prob->p/2] = ds->nPos + i;
   }
@@ -45,8 +43,6 @@ void init_prob(struct Fullproblem *prob, struct denseData *ds)
     for (int i = 1+(prob->p/2); i < ds->nNeg; i++) {
       prob->inactive[ds->nPos-(prob->p)+i] = ds->nPos + i;
     }
-    //fprintf(stderr, "fullproblem.cpp: init_prob(): Not yet working for odd\n");
-    //(1);
   }
   else{
     for (int i = prob->p/2; i < ds->nPos; i++) {
@@ -56,7 +52,6 @@ void init_prob(struct Fullproblem *prob, struct denseData *ds)
       prob->inactive[ds->nPos-(prob->p)+i] = ds->nPos + i;
     }
   }
-
 }
 
 
