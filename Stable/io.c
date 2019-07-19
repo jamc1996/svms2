@@ -94,7 +94,6 @@ void count_entries(FILE *input, struct denseData* ds)
     for (int i = 0; i < ds->nFeatures+1; i++) {
       p = strtok(NULL, " \t");
     }
-    printf("p = %s\n",p );
     counter++;
     int num = atoi(p);
     if (num == 1) {
