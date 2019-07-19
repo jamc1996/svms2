@@ -182,7 +182,7 @@ int checkConstraints(struct Projected* sp, struct Fullproblem *fp)
     }
   }
   for (int i = 0; i < sp->p; i++) {
-    if(temp[i]<= -sp->C){
+    if(temp[i] <= -sp->C){
       flag = i;
       for (int j = 0; j < sp->p; j++) {
         if (temp[i] > temp[j]) {
@@ -195,18 +195,10 @@ int checkConstraints(struct Projected* sp, struct Fullproblem *fp)
   }
   for (int i = 0; i < sp->p; i++) {
     if(temp[i]>sp->C){
-      if (temp[i]>sp->C*2) {
-        //free(temp);
-        //return i+(2*sp->p);
-      }
       free(temp);
       return i+sp->p;
     }
     else if(temp[i]<0.0){
-      if (temp[i]< -sp->C) {
-        //free(temp);
-        //return i-(2*sp->p);
-      }
       free(temp);
       return i-sp->p;
     }
