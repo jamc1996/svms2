@@ -315,7 +315,7 @@ int checkfpConstraints(struct Fullproblem *fp)
 
 void adjustGradF(struct Fullproblem *fp, struct denseData *ds, struct Projected *sp, int n, int worst, int signal, int target, int flag, struct svm_args *params, double diff)
 {
-  // Update based on change of H matrix:
+  // updatee based on change of H matrix:
   double* nline = findListLine(fp->partialH,fp->active[n]);
   if (signal == -1) {
     for (int i = 0; i < fp->q; i++) {

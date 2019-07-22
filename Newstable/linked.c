@@ -1,44 +1,5 @@
 #include "linked.h"
 
-// int main()
-// {
-//   List l = Init_Empty_List();
-//   printf("\nCreated Empty List:\n\n" );
-//   print_list(l);
-//
-//   printf("\nAppended Three and Prepended Four\n\n" );
-//   l = append("Three",l);
-//   l = prepend("Four",l);
-//
-//   print_list(l);
-//
-//   printf("\nAppended 'Two' and 'Blast Off' and Prepended 'Six'\n\n" );
-//   l = append("Two",l);
-//   l = append("Blast Off",l);
-//   l = prepend("Six",l);
-//
-//   print_list(l);
-//
-//   printf("\nInserted 'Five' after 'Six' and 'One' before 'Blast Off'\n\n" );
-//
-//   l = insert_after("Six", "Five", l);
-//   l = insert_before("Blast Off","One", l);
-//
-//   print_list(l);
-//
-//   l = reverse(l);
-//   printf("\nNow printing reversed\n\n");
-//   print_list(l);
-//
-//
-//   printf("\nThis should be the original list:\n\n");
-//   l = reverse(l);
-//   print_list(l);
-//
-//   free_list(l);
-//
-//   return 0;
-// }
 double* findListLineSetLabel(List l, int n , int newLabel)
 {
   Cell* temp = l.head;
@@ -97,26 +58,14 @@ List append(struct denseData *ds, List l, int n)
   {
     l.head->label = n;
     l.head->line = malloc(sizeof(double)*ds->nInstances);
-    for (int i = 0; i < ds->nInstances; i++) {
-      l.head->line[i] = 0.0;
-      for (int j = 0; j < ds->nFeatures; j++) {
-        l.head->line[i] += ds->data[i][j]*ds->data[n][j];
-      }
-      l.head->line[i]*= ds->y[i]*ds->y[n];
-    }
+    appendUpdate(ds,l.head->line,n);
     return l;
   }
   if (l.tail->line == NULL)
   {
     l.tail->label = n;
     l.tail->line = malloc(sizeof(double)*ds->nInstances);
-    for (int i = 0; i < ds->nInstances; i++) {
-      l.tail->line[i] = 0.0;
-      for (int j = 0; j < ds->nFeatures; j++) {
-        l.tail->line[i] += ds->data[i][j]*ds->data[n][j];
-      }
-      l.tail->line[i]*= ds->y[i]*ds->y[n];
-    }
+    appendUpdate(ds,l.tail->line,n);
     return l;
   }
 
@@ -125,15 +74,8 @@ List append(struct denseData *ds, List l, int n)
 
   Cell *new = malloc(sizeof(Cell));
   new->line = malloc(sizeof(double)*ds->nInstances);
-  for (int i = 0; i < ds->nInstances; i++) {
-    new->line[i] = 0.0;
-    for (int j = 0; j < ds->nFeatures; j++) {
-      new->line[i] += ds->data[i][j]*ds->data[n][j];
-    }
-    new->line[i]*= ds->y[i]*ds->y[n];
-  }
-
   new->label = n;
+  appendUpdate(ds,new->line,n);
   new->prev = l.tail;
   l.tail->next = new;
   new->next = NULL;

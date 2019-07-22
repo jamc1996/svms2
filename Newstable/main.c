@@ -20,7 +20,6 @@
 
 int main(int argc, char *argv[]) {
   char* filename = NULL;
-  struct svm_args parameters;
   struct denseData ds;
   struct Fullproblem fp;
   struct Projected sp;
@@ -35,23 +34,6 @@ int main(int argc, char *argv[]) {
   parse_arguments(argc, argv, &filename, &parameters);
   read_file(filename, &ds);
   //preprocess(&ds);
-  //
-
-
-  // double* bigH = malloc(sizeof(double)*ds.nInstances*ds.nInstances);
-  // double** fullBigH = malloc(sizeof(double*)*ds.nInstances);
-  // double Hx, Hy;
-  // for (int i = 0; i < ds.nInstances; i++) {
-  //   fullBigH[i] = &bigH[i*ds.nInstances];
-  //   for (int j = 0; j < ds.nInstances; j++) {
-  //     fullBigH[i][j] = 0.0;
-  //     for (int k = 0; k < ds.nFeatures; k++) {
-  //       fullBigH[i][j] += ds.data[i][k]*ds.data[j][k];
-  //     }
-  //     fullBigH[i][j] *= ds.y[j]*ds.y[i];
-  //   }
-  // }
-  // double* check = malloc(sizeof(double)*ds.nInstances);
 
 
 
@@ -79,112 +61,26 @@ int main(int argc, char *argv[]) {
   int max_iters = 10000000;
   int itt = 0;
   int n = 0;
-  int newRows = 0;
+
   setH(&fp, &ds, &parameters);
 
   while(k){
-  //  break;
     // H matrix columns re-set and subproblem changed
-    //printf("\n\nitt = %d\n\n\n",itt );
     if(itt%10000 == 0){
       printf("itt = %d\n",itt );
     }
 
     init_subprob(&sp, &fp, &ds, &parameters, 1);
 
-    // for (int i = 0; i < fp.n; i++) {
-    //   check[i] = 1.0;
-    //   for (int j = 0; j < fp.n; j++) {
-    //     check[i] -= fullBigH[i][j]*fp.alpha[j];
-    //   }
-    // }
-    // for (int i = 0; i < fp.n; i++) {
-    //   if (fabs(fp.gradF[i] - check[i]) > 0.00001 ) {
-    //     printf("p is %d\n",sp.p );
-    //     for (int j = 0; j < fp.p; j++) {
-    //       printf("%d\n",fp.active[j] );
-    //     }
-    //     for (int j = 0; j < fp.n; j++) {
-    //       printf("%lf\n",fabs(fp.gradF[j] - check[j]) );
-    //     }
-    //
-    //     printf("here %lf aaand %lf\n",fp.gradF[i], check[i] );
-    //     exit(69);
-    //   }
-    // }
-
     //  congjugate gradient algorithm
-    //  n = 0 if algorithm completes
-    //  n != 0 if algorithm interrupt
+    //  if algorithm completes n == 0
+    //  if algorithm interrupt n != 0
     n = cg(&sp, &fp);
 
 
     updateAlphaR(&fp, &sp);
     calcYTR(&sp, &fp);
     calculateBeta(&fp, &sp, &ds);
-
-    for (int i = 0; i < fp.q; i++) {
-      if (fp.beta[i] < 0) {
-//        printf("beta[%d] == %lf (%d) (%lf)\n",i,fp.beta[i],fp.inactive[i],fp.alpha[fp.inactive[i]]);
-      }
-    }
-    int john = (n+sp.p+sp.p)%sp.p;
-
-    // Cell *temp = fp.partialH.head;
-    // int ko = 0;
-    // while (temp != NULL) {
-    //   if (fp.active[ko] != temp->label ) {
-    //     printf("ko = %d\n",ko );
-    //     printf("%d %d\n",fp.active[ko],temp->label );
-    //     exit(29);
-    //   }
-    //   for (int i = 0; i < fp.n; i++) {
-    //     if (fabs(temp->line[i]-fullBigH[temp->label][i]) > 0.0001) {
-    //       printf("itt is %d\n",itt );
-    //       printf("%lf and %lf\n",temp->line[i], fullBigH[temp->label][i] );
-    //       printf("label is %d\n",temp->label );
-    //       printf("i is %d\n",i );
-    //       for (int z = 0; z < fp.n; z++) {
-    //         printf("%lf\n",fabs(temp->line[z]-fullBigH[temp->label][z]) );
-    //       }
-    //       exit(42);
-    //     }
-    //   }
-    //   temp = temp->next;
-    //   ko++;
-    // }
-    //
-    // printf("%lf\n",sp.ytr );
-    // printf("%d and %lf\n",john,fp.alpha[fp.active[john]] );
-    // for (int i = 0; i < fp.p; i++) {
-    //   printf("activ %d\n",fp.active[i] );
-    // }
-    // printf("\n" );
-    //
-    // for (int i = 0; i < fp.n; i++) {
-    //   check[i] = 1.0;
-    //   for (int j = 0; j < fp.n; j++) {
-    //     check[i] -= fullBigH[i][j]*fp.alpha[j];
-    //   }
-    // }
-    // for (int i = 0; i < fp.n; i++) {
-    //   if (fabs(fp.gradF[i] - check[i]) > 0.00001 ) {
-    //     printf("p is %d\n",sp.p );
-    //     for (int j = 0; j < fp.p; j++) {
-    //       printf("%d\n",fp.active[j] );
-    //     }
-    //     printf("n is %d i is %d\n",fp.n,i );
-    //     for (int j = 0; j < fp.n; j++) {
-    //       printf("%lf\n",fabs(fp.gradF[j] - check[j]) );
-    //     }
-    //
-    //     printf("here %lf aaand %lf\n",fp.gradF[i], check[i] );
-    //     exit(22);
-    //   }
-    // }
-
-
-
 
     if (n==0) {
       printf("Converged! (itt = %d) %d\n", itt, fp.p );
@@ -198,9 +94,7 @@ int main(int argc, char *argv[]) {
       }
 
       changeP(&fp, &sp, add);
-
       reinitprob(&ds, &fp, &sp, add, temp, temp2);
-      newRows = 0;
 
       free(temp);
       free(temp2);
@@ -211,11 +105,9 @@ int main(int argc, char *argv[]) {
       k = singleswap(&ds, &fp, &sp, n, &parameters);
       if (k < 0) {
         shrinkSize(&fp, &sp, k+fp.p);
-        newRows = 0;
       }
       else{
         n = checkfpConstraints(&fp);
-        newRows = 0;
       }
     }
 
@@ -224,6 +116,7 @@ int main(int argc, char *argv[]) {
       printf("Reached max iters (%d)!!!!!\n\n\n",itt );
       break;
     }
+
   }
   gettimeofday(&trainEnd, 0);
 

@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "svm.h"
+#include "kernels.h"
 
 
 double* findListLine(List l, int n);

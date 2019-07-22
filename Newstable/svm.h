@@ -102,4 +102,7 @@ struct Fullproblem{
 	List partialH;
 } fullprob;
 
+struct svm_args parameters;
+
+
 #endif

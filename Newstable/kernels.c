@@ -6,8 +6,8 @@ int setH(struct Fullproblem *prob, struct denseData *ds, struct svm_args *params
  *  TO DO -> ALLOW ONLY UPDATE THE SWAPPED OUT VALUES - or not?   */
 {
   Cell *temp = prob->partialH.head;
+  int i = 0;
   if (params->kernel == LINEAR) {
-    int i = 0;
     while(temp != NULL) {
       for (int j = 0; j < prob->n; j++) {
         temp->line[j] = 0.0;
@@ -19,23 +19,25 @@ int setH(struct Fullproblem *prob, struct denseData *ds, struct svm_args *params
       temp = temp->next;
       i++;
     }
-  }/*
+  }
   else if (params->kernel == POLYNOMIAL) {
-    for (int i = 0; i < prob->p; i++) {
+    while(temp != NULL) {
       for (int j = 0; j < prob->n; j++) {
-        prob->partialH[i][j] = 0.0;
+        temp->line[j] = 0.0;
         for (int k = 0; k < ds->nFeatures; k++) {
-          prob->partialH[i][j] += ds->data[j][k]*ds->data[prob->active[i]][k];
+          temp->line[j] += ds->data[j][k]*ds->data[prob->active[i]][k];
         }
-        prob->partialH[i][j] = pow(prob->partialH[i][j]+params->Gamma, params->degree);
-        prob->partialH[i][j] *= ds->y[prob->active[i]]*ds->y[j];
+        temp->line[j] = pow(temp->line[j]+params->Gamma, params->degree);
+        temp->line[j] *= ds->y[prob->active[i]]*ds->y[j];
       }
+      i++;
+      temp = temp->next;
     }
   }
   else if (params->kernel == EXPONENTIAL) {
     double x;
     double y;
-    for (int i = 0; i < prob->q; i++) {
+    while (temp != NULL) {
       for (int j = 0; j < prob->p; j++) {
         y = 0.0;
         for (int k = 0; k < ds->nFeatures; k++) {
@@ -43,66 +45,71 @@ int setH(struct Fullproblem *prob, struct denseData *ds, struct svm_args *params
           y -= x*x;
         }
         y *= params->Gamma;
-        prob->partialH[i][j] = exp(y)*ds->y[prob->active[i]]*ds->y[j];
+        temp->line[j] = exp(y)*ds->y[prob->active[i]]*ds->y[j];
       }
+      i++;
+      temp = temp->next;
     }
   }
   else {
     return 1;
-  }*/
+  }
   return 0;
 }
 
 int updateSubH(struct Fullproblem *fp, struct Projected *sp, struct denseData *ds, struct svm_args *params)
 {
-  if (params->kernel == LINEAR) {
-    for (int i = 0; i < sp->p; i++) {
-      for (int j = i; j < sp->p; j++) {
-        sp->H[i][j] = 0.0;
-        for (int k = 0; k < ds->nFeatures; k++) {
-          sp->H[i][j] += ds->data[fp->active[i]][k]*ds->data[fp->active[j]][k];
-        }
-        sp->H[i][j] *= ds->y[ fp->active[i] ] * ds->y[ fp->active[j] ];
-      }
+  Cell* temp = fp->partialH.head;
+  int i = 0;
+  while ( temp != NULL ) {
+    for (int j = i; j < fp->p ; j++) {
+      sp->H[i][j] = temp->line[fp->active[j]];
     }
-  }/*
-  else if (params->kernel == POLYNOMIAL) {
-    for (int i = 0; i < fp->p; i++) {
-      for (int j = i; j < fp->p; j++) {
-        sp->H[i][j] = 0.0;
-        for (int k = 0; k < ds->nFeatures; k++) {
-          sp->H[i][j] += ds->data[fp->active[i]][k]*ds->data[fp->active[j]][k];
-        }
-        sp->H[i][j] = pow(sp->H[i][j]+params->Gamma, params->degree);
-        sp->H[i][j] *= ds->y[fp->active[i]]*ds->y[fp->active[j]];
-      }
-    }
+    i++;
+    temp = temp->next;
   }
-  else if (params->kernel == EXPONENTIAL) {
-    double x;
-    double y;
-    for (int i = 0; i < fp->p; i++) {
-      for (int j = i; j < fp->p; j++) {
-        y = 0.0;
-        for (int k = 0; k < ds->nFeatures; k++) {
-          x = (ds->data[fp->active[i]][k]- ds->data[fp->active[j]][k]);
-          y -= x*x;
-        }
-        y *= params->Gamma;
-        sp->H[i][j] = exp(y)*ds->y[fp->active[i]]*ds->y[fp->active[j]];
-      }
-    }
-  }*/
-  else{
-    return 1;
-  }
+
   return 0;
+}
+
+void appendUpdate(struct denseData *ds, double *line, int n)
+{
+  if (parameters.kernel == LINEAR) {
+    for (int i = 0; i < ds->nInstances; i++) {
+      line[i] = 0.0;
+      for (int j = 0; j < ds->nFeatures; j++) {
+        line[i] += ds->data[i][j]*ds->data[n][j];
+      }
+      line[i]*= ds->y[i]*ds->y[n];
+    }
+  }
+  if (parameters.kernel == POLYNOMIAL) {
+    for (int i = 0; i < ds->nInstances; i++) {
+      line[i] = 0.0;
+      for (int j = 0; j < ds->nFeatures; j++) {
+        line[i] += ds->data[i][j]*ds->data[n][j];
+      }
+      line[i] = pow(line[i]+parameters.Gamma, parameters.degree);
+      line[i]*= ds->y[i]*ds->y[n];
+    }
+  }
+  else if (parameters.kernel == EXPONENTIAL) {
+    double x,y;
+    for (int i = 0; i < ds->nInstances; i++) {
+      y = 0.0;
+      for (int j = 0; j < ds->nFeatures; j++) {
+        x = ds->data[i][j] - ds->data[n][j];
+        y -= x*x;
+      }
+      y *= (parameters.Gamma);
+      line[i] = exp(y)*ds->y[i]*ds->y[n];
+    }
+  }
 }
 
 
 void partialHupdate(struct Fullproblem *fp, struct Projected *sp, struct denseData *ds, struct svm_args *params, int n, int worst)
 {
-  Cell* temp = fp->partialH.head;
   double *nline = findListLineSetLabel(fp->partialH, fp->active[n],fp->inactive[worst]);
   if (params->kernel == LINEAR) {
     for (int j = 0; j < fp->n; j++) {
@@ -112,120 +119,36 @@ void partialHupdate(struct Fullproblem *fp, struct Projected *sp, struct denseDa
       }
       nline[j]*=ds->y[fp->inactive[worst]]*ds->y[j];
     }
-    for (int i = 0; i < n; i++) {
-      sp->H[i][n] = 0.0;
-      for (int k = 0; k < ds->nFeatures; k++) {
-        sp->H[i][n]+=ds->data[fp->inactive[worst]][k]*ds->data[fp->active[i]][k];
-      }
-      sp->H[i][n]*=ds->y[fp->inactive[worst]]*ds->y[fp->active[i]];
-    }
-
-    sp->H[n][n] = 0.0;
-    for (int k = 0; k < ds->nFeatures; k++) {
-      sp->H[n][n]+=ds->data[fp->inactive[worst]][k]*ds->data[fp->inactive[worst]][k];
-    }
-
-    for (int i = n+1; i < sp->p; i++) {
-      sp->H[n][i] = 0.0;
-      for (int k = 0; k < ds->nFeatures; k++) {
-        sp->H[n][i]+=ds->data[fp->inactive[worst]][k]*ds->data[fp->active[i]][k];
-      }
-      sp->H[n][i]*=ds->y[fp->inactive[worst]]*ds->y[fp->active[i]];
-    }
-
-
-  }/*
+  }
   else if (params->kernel == POLYNOMIAL) {
-    for (int j = 0; j < fp->q; j++) {
-      if (j == worst) {
-        for (int k = 0; k < n; k++) {
-          fp->partialH[k][fp->inactive[j]] = sp->H[k][n];
-        }
-        for (int k = n+1; k < fp->p; k++) {
-          fp->partialH[j][k] = sp->H[n][k];
-        }
-        continue;
-      }
-      fp->partialH[j][n] = 0.0;
+    for (int j = 0; j < fp->n; j++) {
+      nline[j] = 0.0;
       for (int k = 0; k < ds->nFeatures; k++) {
-        fp->partialH[j][n]+=ds->data[fp->inactive[worst]][k]*ds->data[fp->inactive[j]][k];
+        nline[j]+=ds->data[fp->inactive[worst]][k]*ds->data[j][k];
       }
-      fp->partialH[j][n] = pow(fp->partialH[j][n]+params->Gamma, params->degree);
-      fp->partialH[j][n] *= ds->y[fp->inactive[worst]]*ds->y[fp->inactive[j]];
-    }
-
-    for (int i = 0; i < n; i++) {
-      sp->H[i][n] = 0.0;
-      for (int k = 0; k < ds->nFeatures; k++) {
-        sp->H[i][n]+=ds->data[fp->inactive[worst]][k]*ds->data[fp->active[i]][k];
-      }
-      sp->H[i][n] = pow(sp->H[i][n]+params->Gamma, params->degree);
-      sp->H[i][n]*=ds->y[fp->inactive[worst]]*ds->y[fp->active[i]];
-    }
-
-    sp->H[n][n] = 0.0;
-    for (int k = 0; k < ds->nFeatures; k++) {
-      sp->H[n][n]+=ds->data[fp->inactive[worst]][k]*ds->data[fp->inactive[worst]][k];
-    }
-    sp->H[n][n] = pow(sp->H[n][n]+params->Gamma, params->degree);
-
-    for (int i = n+1; i < sp->p; i++) {
-      sp->H[n][i] = 0.0;
-      for (int k = 0; k < ds->nFeatures; k++) {
-        sp->H[n][i]+=ds->data[fp->inactive[worst]][k]*ds->data[fp->active[i]][k];
-      }
-      sp->H[n][i] = pow(sp->H[n][i]+params->Gamma, params->degree);
-      sp->H[n][i]*=ds->y[fp->inactive[worst]]*ds->y[fp->active[i]];
+      nline[j] = pow(nline[j]+params->Gamma, params->degree);
+      nline[j] *= ds->y[fp->inactive[worst]]*ds->y[j];
     }
   }
   else if (params->kernel == EXPONENTIAL) {
     double x,y;
-    for (int j = 0; j < fp->q; j++) {
-      if (j == worst) {
-        for (int k = 0; k < n; k++) {
-          fp->partialH[j][k] = sp->H[k][n];
-        }
-        for (int k = n+1; k < fp->p; k++) {
-          fp->partialH[j][k] = sp->H[n][k];
-        }
-        continue;
-      }
+    for (int j = 0; j < fp->n; j++) {
       y = 0.0;
       for (int k = 0; k < ds->nFeatures; k++) {
-        x = ds->data[fp->inactive[worst]][k] - ds->data[fp->inactive[j]][k];
+        x = ds->data[fp->inactive[worst]][k] - ds->data[j][k];
         y -= x*x;
       }
       y *= (params->Gamma);
-      fp->partialH[j][n] = exp(y)*ds->y[fp->inactive[worst]]*ds->y[fp->inactive[j]];
+      nline[j] = exp(y)*ds->y[fp->inactive[worst]]*ds->y[j];
     }
+  }
 
-    for (int i = 0; i < n; i++) {
-      y = 0.0;
-      for (int k = 0; k < ds->nFeatures; k++) {
-        x = ds->data[fp->inactive[worst]][k] - ds->data[fp->active[i]][k];
-        y -= x*x;
-      }
-      y *= (params->Gamma);
-      sp->H[i][n] = exp(y)*ds->y[fp->inactive[worst]]*ds->y[fp->active[i]];
-    }
+  for (int i = 0; i < n; i++) {
+    sp->H[i][n] = nline[fp->active[i]];
+  }
+  sp->H[n][n] = nline[fp->inactive[worst]];
 
-    y = 0.0;
-    for (int k = 0; k < ds->nFeatures; k++) {
-      x = ds->data[fp->inactive[worst]][k] - ds->data[fp->inactive[worst]][k];
-      y -= x*x;
-    }
-    y *= params->Gamma;
-    sp->H[n][n] = exp(y);
-
-    for (int i = n+1; i < sp->p; i++) {
-      y = 0.0;
-      for (int k = 0; k < ds->nFeatures; k++) {
-        x = ds->data[fp->inactive[worst]][k] - ds->data[fp->active[i]][k];
-        y += x*x;
-      }
-      y *= params->Gamma;
-      sp->H[n][i] = exp(y)*ds->y[fp->inactive[worst]]*ds->y[fp->active[i]];
-    }
-
-  }*/
+  for (int i = n+1; i < sp->p; i++) {
+    sp->H[n][i] = nline[fp->active[i]];
+  }
 }
