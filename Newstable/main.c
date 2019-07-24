@@ -36,6 +36,45 @@ int main(int argc, char *argv[]) {
   //preprocess(&ds);
 
 
+	double* hh = malloc(sizeof(double)*ds.nInstances*ds.nInstances);
+	double** fullBigH = malloc(sizeof(double*)*ds.nInstances);
+	for(int i = 0; i<ds.nInstances; i++){
+		fullBigH[i] = &hh[i*ds.nInstances];
+	}
+	for(int i = 0; i<ds.nInstances; i++){
+		for(int j = 0; j<ds.nInstances; j++){
+			fullBigH[i][j] = 0.0;
+			for(int k=0; k < ds.nFeatures; k++){
+				fullBigH[i][j] += ds.data[i][k]*ds.data[j][k];
+			}
+			if( (i < ds.nPos ) ^ ( j < ds.nPos) ) {
+				fullBigH[i][j] = - fullBigH[i][j];
+			}
+		}
+	}
+
+
+	double *check = malloc(sizeof(double)*ds.nInstances);
+
+  // double* bigH = malloc(sizeof(double)*ds.nInstances*ds.nInstances);
+  // double** fullBigH = malloc(sizeof(double*)*ds.nInstances);
+  // double Hx, Hy;
+  // for (int i = 0; i < ds.nInstances; i++) {
+  //   fullBigH[i] = &bigH[i*ds.nInstances];
+  //   for (int j = 0; j < ds.nInstances; j++) {
+  //     Hy = 0.0;
+  //     for (int k = 0; k < ds.nFeatures; k++) {
+  //       Hx = (ds.data[i][k]-ds.data[j][k]);
+  //       Hy -= Hx*Hx;
+  //     }
+  //     Hy *= parameters.Gamma;
+  //     fullBigH[i][j] = exp(Hy)*ds.y[j]*ds.y[i];
+  //   }
+  // }
+  // double* check = malloc(sizeof(double)*ds.nInstances);
+  //cleanData(&ds);
+
+
 
 
   //cleanData(&ds);
@@ -62,7 +101,7 @@ int main(int argc, char *argv[]) {
   int itt = 0;
   int n = 0;
 
-  setH(&fp, &ds, &parameters);
+ // setH(&fp, &ds, &parameters);
 
   while(k){
     // H matrix columns re-set and subproblem changed
@@ -77,10 +116,33 @@ int main(int argc, char *argv[]) {
     //  if algorithm interrupt n != 0
     n = cg(&sp, &fp);
 
-
     updateAlphaR(&fp, &sp);
     calcYTR(&sp, &fp);
     calculateBeta(&fp, &sp, &ds);
+
+
+    /* printf("%lf\n",sp.ytr );
+   //  printf("%d and %lf\n",john,fp.alpha[fp.active[john]] );
+     for (int i = 0; i < fp.p; i++) {
+       printf("activ %d alpha %lf\n",fp.active[i],fp.alpha[fp.active[i]] );
+     }
+     printf("\n" );
+
+     for (int i = 0; i < fp.n; i++) {
+       check[i] = 1.0;
+       for (int j = 0; j < fp.n; j++) {
+         check[i] -= fullBigH[i][j]*fp.alpha[j];
+       }
+     }
+     for (int i = 0; i < fp.n; i++) {
+       if (fabs(fp.gradF[i] - check[i]) > 0.00001 ) {
+         printf("n is %d i is %d\n",fp.n,i );
+    
+         printf("here %lf aaand %lf\n",fp.gradF[i], check[i] );
+         exit(22);
+       }
+     }*/
+
 
     if (n==0) {
       printf("Converged! (itt = %d) %d\n", itt, fp.p );
@@ -119,11 +181,6 @@ int main(int argc, char *argv[]) {
 
   }
   gettimeofday(&trainEnd, 0);
-
-
-  for (int i = 0; i < fp.n; i++) {
-    printf("%lf\n",fp.alpha[i] );
-  }
 
   if (parameters.save) {
     saveTrainedModel(&fp, &ds, parameters.savename, &parameters);

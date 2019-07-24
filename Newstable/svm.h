@@ -42,7 +42,6 @@ struct denseData{
 	int nNeg;
   double** data;
   double* data1d;
-	double* y;
   char** instanceLabels;
   char** featureLabels;
 };

@@ -12,7 +12,7 @@ void read_file(char* filename, struct denseData* ds){
   ds->data = (double**)malloc(sizeof(double*)*ds->nInstances);
   ds->instanceLabels = (char**)malloc(sizeof(char*)*ds->nInstances);
   ds->featureLabels = (char**)malloc(sizeof(char*)*ds->nFeatures);
-  ds->y = (double*)malloc(sizeof(double)*ds->nInstances);
+
   double* temp= (double*)malloc(sizeof(double)*ds->nFeatures);
 
   char* line = NULL;
@@ -49,16 +49,12 @@ void read_file(char* filename, struct denseData* ds){
       for (int j = 0; j < ds->nFeatures; j++) {
         ds->data[r][j] = temp[j];
       }
-      ds->y[r] = 1;
-
       r++;
     }
     else if (atoi(p) == -1){
       for (int j = 0; j < ds->nFeatures; j++) {
         ds->data[ds->nPos+q][j] = temp[j];
       }
-      ds->y[ds->nPos+q] = -1;
-
       q++;
 
     }
@@ -146,9 +142,12 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
         for (int k = 0; k < ds->nFeatures; k++) {
           H[i][j] += ds->data[i][k]*ds->data[active[j]][k];
         }
-        H[i][j] *= ds->y[active[j]]*ds->y[i];
-      }
-    }
+				if( (active[j] < ds->nPos) ^ (i < ds->nPos)  ){
+        	H[i][j] = -H[i][j];
+      	}
+    	}
+		}
+
     for (int i = 0; i < count; i++) {
       if (fp->alpha[active[i]] < fp->C*0.99) {
         r = active[i];
@@ -158,18 +157,27 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
     if (r<0) {
       exit(77);
     }
+
     double b = 1.0;
     for (int i = 0; i < count; i++) {
+			printf("b is %lf\n",b);
       b -= H[r][i]*fp->alpha[active[i]];
     }
-    b *= ds->y[r];
-
+			printf("b is %lf\n",b);
+		if(r >= ds->nPos){
+	    b = -b;
+		}
     double *w = malloc(sizeof(double)*ds->nFeatures);
 
     for (int i = 0; i < ds->nFeatures; i++) {
       w[i] = 0.0;
       for (int j = 0; j < count; j++) {
-        w[i] += fp->alpha[active[j]]*ds->data[active[j]][i]*ds->y[active[j]];
+				if(active[j] < ds->nPos){
+	        w[i] += fp->alpha[active[j]]*ds->data[active[j]][i];
+				}
+				else{
+	        w[i] -= fp->alpha[active[j]]*ds->data[active[j]][i];
+				}
       }
     }
 
@@ -191,7 +199,9 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
           H[i][j] += ds->data[i][k]*ds->data[active[j]][k];
         }
         H[i][j] = pow(H[i][j]+params->Gamma, params->degree);
-        H[i][j] *= ds->y[active[j]]*ds->y[i];
+        if(   (active[j] < ds->nPos )  ^  ( i < ds->nPos)  ){
+        	H[i][j] = -H[i][j];
+      	}
       }
     }
     for (int i = 0; i < count; i++) {
@@ -209,8 +219,10 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
     for (int i = 0; i < count; i++) {
       b -= H[r][i]*fp->alpha[active[i]];
     }
-    b *= ds->y[r];
-    fprintf(file, "%lf\n",b );
+		if(r>= ds->nPos){
+	    b = -b;
+		}  
+	  fprintf(file, "%lf\n",b );
 
     for (int i = 0; i < count; i++) {
       for (int j = 0; j < ds->nFeatures; j++) {
@@ -219,9 +231,14 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
     }
 
     for (int i = 0; i < count; i++) {
-      fprintf(file, "%lf\n",fp->alpha[active[i]]*ds->y[active[i]] );
-    }
-  }
+			if(active[i] < ds->nPos){
+	      fprintf(file, "%lf\n",fp->alpha[active[i]] );
+  	  }
+			else{
+	      fprintf(file, "%lf\n",-fp->alpha[active[i]] );
+			}
+  	}
+	}
   else if(params->kernel == EXPONENTIAL)
   {
     fprintf(file, "%d\n", count );
@@ -234,7 +251,10 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
           y -= x*x;
         }
         y *= params->Gamma;
-        H[i][j] = exp(y)*ds->y[active[j]]*ds->y[i];
+        H[i][j] = exp(y);
+				if(  (active[j] < ds->nPos  )   ^   (i < ds->nPos)  ){
+        	H[i][j] = -H[i][j];
+      	}
       }
     }
     for (int i = 0; i < count; i++) {
@@ -250,9 +270,12 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
     double b = 1.0;
 
     for (int i = 0; i < count; i++) {
+			
       b -= H[r][i]*fp->alpha[active[i]];
     }
-    b *= ds->y[r];
+		if(r>=ds->nPos){
+	    b = -b;
+		}
     fprintf(file, "%lf\n",b );
 
     for (int i = 0; i < count; i++) {
@@ -262,10 +285,14 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
     }
 
     for (int i = 0; i < count; i++) {
-      fprintf(file, "%lf\n",fp->alpha[active[i]]*ds->y[active[i]] );
-    }
-  }
-
+			if(active[i] < ds->nPos){
+	      fprintf(file, "%lf\n",fp->alpha[active[i]] );
+  	  }
+			else{
+	      fprintf(file, "%lf\n",-fp->alpha[active[i]] );
+  	  }
+  	}
+	}
   free(active);
   free(h);
   free(H);
@@ -301,14 +328,25 @@ void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params)
       for (int j = 0; j < ds->nFeatures; j++) {
         value += w[j]*ds->data[i][j];
       }
-      if (ds->y[i]*value < 0.0) {
-        printf("%sres[%d] = %.3lf%s\n",RED,i,value,RESET );
-        wrong++;
-      }
-      else{
-        printf("%sres[%d] = %.3lf%s\n",GRN,i,value,RESET );
-      }
-    }
+			if(i<ds->nPos){
+	      if (value < 0.0) {
+  	      printf("%sres[%d] = %.3lf%s\n",RED,i,value,RESET );
+  	      wrong++;
+  	    }
+  	    else{
+  	      printf("%sres[%d] = %.3lf%s\n",GRN,i,value,RESET );
+  	    }
+    	}
+			else{
+	      if (value > 0.0) {
+  	      printf("%sres[%d] = %.3lf%s\n",RED,i,value,RESET );
+  	      wrong++;
+  	    }
+  	    else{
+  	      printf("%sres[%d] = %.3lf%s\n",GRN,i,value,RESET );
+  	    }
+    	}
+		}
     free(w);
   }
   else if(params->kernel == POLYNOMIAL)  {
@@ -341,13 +379,24 @@ void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params)
         contrib = pow(contrib + params->Gamma, params->degree);
         value += alphaY[j]*contrib;
       }
-      if (ds->y[i]*value < 0.0) {
-        printf("%sres[%d] = %.3lf%s\n",RED,i,value,RESET );
-        wrong++;
-      }
-      else{
-        printf("%sres[%d] = %.3lf%s\n",GRN,i,value,RESET );
-      }
+			if(i<ds->nPos){
+	      if (value < 0.0) {
+  	      printf("%sres[%d] = %.3lf%s\n",RED,i,value,RESET );
+  	      wrong++;
+  	    }
+  	    else{
+  	      printf("%sres[%d] = %.3lf%s\n",GRN,i,value,RESET );
+  	    }
+    	}
+			else{
+	      if (value > 0.0) {
+  	      printf("%sres[%d] = %.3lf%s\n",RED,i,value,RESET );
+  	      wrong++;
+  	    }
+  	    else{
+  	      printf("%sres[%d] = %.3lf%s\n",GRN,i,value,RESET );
+  	    }
+    	}
     }
   }
   else if(params->kernel == EXPONENTIAL)  {
@@ -382,13 +431,24 @@ void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params)
         contrib *= params->Gamma;
         value += alphaY[j]*exp(contrib);
       }
-      if (ds->y[i]*value < 0.0) {
-        printf("%sres[%d] = %.3lf%s\n",RED,i,value,RESET );
-        wrong++;
-      }
-      else{
-        printf("%sres[%d] = %.3lf%s\n",GRN,i,value,RESET );
-      }
+			if(i<ds->nPos){
+	      if (value < 0.0) {
+  	      printf("%sres[%d] = %.3lf%s\n",RED,i,value,RESET );
+  	      wrong++;
+  	    }
+  	    else{
+  	      printf("%sres[%d] = %.3lf%s\n",GRN,i,value,RESET );
+  	    }
+    	}
+			else{
+	      if (value > 0.0) {
+  	      printf("%sres[%d] = %.3lf%s\n",RED,i,value,RESET );
+  	      wrong++;
+  	    }
+  	    else{
+  	      printf("%sres[%d] = %.3lf%s\n",GRN,i,value,RESET );
+  	    }
+    	}
     }
   }
 
@@ -399,7 +459,6 @@ void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params)
   fclose(fp);
 
 }
-
 int readline(FILE *input, char **line)
 /* Function to read lines from file */
 {
@@ -556,7 +615,6 @@ void freeDenseData(struct denseData *ds)
 {
   free(ds->data);
   free(ds->data1d);
-  free(ds->y);
   free(ds->instanceLabels);
   free(ds->featureLabels);
 }

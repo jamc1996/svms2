@@ -35,7 +35,11 @@ void init_subprob(struct Projected *sp, struct Fullproblem *fp, struct denseData
  */
 {
   for (int i = 0; i < sp->p; i++) {
-    sp->yHat[i] = ds->y[fp->active[i]];
+		if(fp->active[i] < ds->nPos){
+    	sp->yHat[i] = 1;
+		}else{
+			sp->yHat[i] = -1;
+		}
     sp->alphaHat[i] = 0.0;    // This is the change from original
     sp->rHat[i] = fp->gradF[fp->active[i]];
   }

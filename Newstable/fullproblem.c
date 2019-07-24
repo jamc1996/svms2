@@ -95,10 +95,18 @@ void calculateBeta(struct Fullproblem *fp, struct Projected *sp, struct denseDat
 {
   for (int i = 0; i < fp->q; i++) {
     if (fp->alpha[fp->inactive[i]] < 0.0000000001) {
-      fp->beta[i] =  - fp->gradF[fp->inactive[i]] + (ds->y[fp->inactive[i]]*sp->ytr);
-    }
+			if(fp->inactive[i] < ds->nPos) {
+	      fp->beta[i] =  - fp->gradF[fp->inactive[i]] + (sp->ytr);
+  	  }else{
+	      fp->beta[i] =  - fp->gradF[fp->inactive[i]] - (sp->ytr);
+			}
+		}
     else if (fp->alpha[fp->inactive[i]] >= sp->C - 0.001) {
-      fp->beta[i] =  fp->gradF[fp->inactive[i]] - ds->y[fp->inactive[i]]*sp->ytr;
+			if(fp->inactive[i] < ds->nPos){
+	      fp->beta[i] =  fp->gradF[fp->inactive[i]] - (sp->ytr);
+  	  }else{
+	      fp->beta[i] =  fp->gradF[fp->inactive[i]] + (sp->ytr);
+			}
     }
   }
 }
@@ -124,10 +132,14 @@ void findWorst(int *worst, int* target, int* change, int *n, struct denseData *d
       (*change) = 1;
     }
   }
-  *target = ds->y[fp->active[*n]]*(*change);
-
+	if(fp->active[*n] < ds->nPos){
+  	*target = (*change);
+	}
+	else{
+		*target = -(*change);
+	}
   for (int i = 0; i < fp->q; i++) {
-    if( ds->y[fp->inactive[i]] == *target )  {
+    if( (fp->inactive[i] < ds->nPos && *target == 1) || (ds->nPos <= fp->inactive[i] && *target == -1) )  {
       if (fp->beta[i] < tester) {
         if (fp->alpha[fp->inactive[i]] < fp->C*0.8){
           *worst = i;
@@ -135,7 +147,7 @@ void findWorst(int *worst, int* target, int* change, int *n, struct denseData *d
         }
       }
     }
-    if( ds->y[fp->inactive[i]] != *target )  {
+		else{
       if (fp->beta[i] < tester) {
         if (fp->alpha[fp->inactive[i]] > 0.1){
           *worst = i;
@@ -156,7 +168,7 @@ void spreadChange(struct denseData *ds, struct Fullproblem *fp, struct Projected
   while (temp != NULL) {
     for (int j = 0; j < fp->q; j++) {
       if (temp->label != fp->active[n]) {
-        if (ds->y[temp->label] == target){
+        if ( (temp->label < ds->nPos && target== 1) || (temp->label >= ds->nPos && target== -1) ){
           fp->gradF[fp->inactive[j]] -= temp->line[fp->inactive[j]]*diff/(double)(fp->p-1);
         }
         else{
@@ -172,7 +184,7 @@ void spreadChange(struct denseData *ds, struct Fullproblem *fp, struct Projected
   for (int i = 0; i < fp->p; i++) {
     for (int j = 0; j < fp->p; j++) {
       if (j != n) {
-        if (ds->y[fp->active[j]] == target){
+        if ( (fp->active[j] < ds->nPos && target > 0) ||  (fp->active[j] >= ds->nPos && target < 0)     ){
           if (i<j) {
             fp->gradF[fp->active[i]] -= sp->H[i][j]*diff/(double)(fp->p-1);
           }
@@ -208,7 +220,7 @@ void spreadChange(struct denseData *ds, struct Fullproblem *fp, struct Projected
   // Minor alpha changes
   for (int j = 0; j < fp->p; j++) {
     if (j != n) {
-      if (ds->y[fp->active[j]] == target){
+      if ( (fp->active[j] < ds->nPos && target > 0) ||  (fp->active[j] >= ds->nPos && target < 0) ){
         fp->alpha[fp->active[j]] += diff/(double)(fp->p-1);
       }
       else{
@@ -259,7 +271,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
   int temp = fp->active[n];
   if (flag)
   {
-    if (ds->y[fp->inactive[worst]] == target) {
+    if ( (fp->inactive[worst] < ds->nPos && target > 0) || (fp->inactive[worst] >= ds->nPos && target < 0)	) {
       adjustGradF(fp, ds, sp, n, worst, change, 1, flag, params, diff);
       fp->alpha[fp->inactive[worst]] += diff;
       fp->alpha[fp->active[n]] = sp->C;
@@ -278,7 +290,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
   }
   else
   {
-    if (ds->y[fp->inactive[worst]] == target) {
+    if ( (fp->inactive[worst] < ds->nPos && target > 0) || (fp->inactive[worst] >= ds->nPos && target < 0)	) {
       adjustGradF(fp, ds, sp, n, worst, change, 1, flag, params, diff);
       fp->alpha[fp->inactive[worst]] += diff;
       fp->alpha[fp->active[n]] = 0.0;//sp->C ;
