@@ -1,3 +1,5 @@
+Newstable/*.o
+MP/*.o
 Stable/*.o
 Stable/gert
 .DS_Store
