@@ -1,69 +1,80 @@
 #include "io.h"
 
-void read_file(char* filename, struct denseData* ds){
+/*      io.c -- program with functions for reading a .txt file aswell as
+ *               storing/testing trained models
+ *
+ *      Author:     John Cormican
+ *
+ *      Purpouse:   To manage the input and output of the program.
+ *
+ *      Usage:      read_file() called from main(). save_trained_model or
+ *                    test_trained_model may also be used.
+ *
+ */
+
+void read_file(char* filename, struct denseData* ds)
+/* Function to read an appropriately formatted text file and store the
+ * information in denseData struct.
+ */
+{
+  // File opened
   FILE *fp = fopen(filename, "r");
   if (fp == NULL){
     fprintf(stderr, "gert: io.c: read_file() - file %s not found\n",filename );
     exit(1);
   }
+
+  // Dimensions of the data found
   count_entries(fp, ds);
 
-  ds->data1d = (double*)malloc(sizeof(double)*ds->nInstances*ds->nFeatures);
-  ds->data = (double**)malloc(sizeof(double*)*ds->nInstances);
-  ds->instanceLabels = (char**)malloc(sizeof(char*)*ds->nInstances);
-  ds->featureLabels = (char**)malloc(sizeof(char*)*ds->nFeatures);
+  //Space allocated
+  ds->data1d = malloc(sizeof(double)*ds->nInstances*ds->nFeatures);
+  ds->data = malloc(sizeof(double*)*ds->nInstances);
 
-  double* temp= (double*)malloc(sizeof(double)*ds->nFeatures);
-
+  double* temp;
   char* line = NULL;
   char* endptr;
-  if (0) {
-    for (int i = 0; i < ds->nFeatures; i++) {
-      ds->featureLabels[i] = strtok(NULL, " \t");
-    }
-  }
+
+  //Iterate through the data
   for (int i = 0; i < ds->nInstances; i++) {
     ds->data[i] = &ds->data1d[i*ds->nFeatures];
   }
   int r = 0;
-  int q = 0;
+  int q = ds->nPos;
   for (int i = 0; i < ds->nInstances; i++) {
     readline(fp,&line);
-    ds->instanceLabels[i] = strtok(line, " \t");
-    if (ds->instanceLabels[i] == NULL || *(ds->instanceLabels[i]) == '\n') {
+    char* p = strtok(line, " \t");
+    if (p == NULL || *p == '\n') {
       fprintf(stderr, "main.cpp: read_file(): bad read at %d\n",i );
       exit(1);
+    }
+    int numP = atoi(p);
+    if(numP == 1){
+      temp = ds->data[r];
+      r++;
+    }else if (numP == -1){
+      temp = ds->data[q];
+      q++;
     }
 
     for (int j = 0; j < ds->nFeatures; j++) {
       char* p = strtok(NULL, " \t");
       if (p == NULL || *p == '\n') {
-        fprintf(stderr, "Oh dear\n" );
+        fprintf(stderr, "main.cpp: read_file(): bad read at line %d\n",i );
         exit(1);
       }
       temp[j] = strtod(p, &endptr);
-//      ds->data[i][j] = strtod(p, &endptr);
-    }
-    char* p = strtok(NULL, " \t");
-    if (atoi(p) == 1) {
-      for (int j = 0; j < ds->nFeatures; j++) {
-        ds->data[r][j] = temp[j];
-      }
-      r++;
-    }
-    else if (atoi(p) == -1){
-      for (int j = 0; j < ds->nFeatures; j++) {
-        ds->data[ds->nPos+q][j] = temp[j];
-      }
-      q++;
-
     }
   }
 
-  free(temp);
+
+  fclose(fp);
 }
 
 void count_entries(FILE *input, struct denseData* ds)
+/*  Function to find the dimensions of the input data and store them
+ *  useful information is ds.
+ */
 {
   ds->nInstances = 0;
   ds->nFeatures = -1;
@@ -74,7 +85,9 @@ void count_entries(FILE *input, struct denseData* ds)
   int counter = 0;
   // Find size of dataset:
   while (readline(input, &line)) {
+    //Find number of features from first line
     if (ds->nFeatures==-1) {
+      ds->nFeatures++;
       char *p = strtok(line," \t");
       while (1) {
         p  = strtok(NULL, " \t");
@@ -86,10 +99,9 @@ void count_entries(FILE *input, struct denseData* ds)
       rewind(input);
       continue;
     }
+
+    //Now find nInstances as well as positive/negative divide.
     char* p = strtok(line," \t");
-    for (int i = 0; i < ds->nFeatures+1; i++) {
-      p = strtok(NULL, " \t");
-    }
     counter++;
     int num = atoi(p);
     if (num == 1) {
@@ -97,209 +109,139 @@ void count_entries(FILE *input, struct denseData* ds)
     }else if(num == -1){
       ds->nNeg++;
     }else{
-      fprintf(stderr, "invalid classes (should be 1 or -1, %d found %d)\n",num,counter);
+      fprintf(stderr, "invalid classes (should be 1 or -1, %d found at line %d)\n",num,counter);
       exit(1);
     }
     ds->nInstances++;
   }
 
   rewind(input);
+
 }
 
-void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filename, struct svm_args *params)
+void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, double ytr)
 {
-  FILE *file = fopen(filename, "w");
-  fprintf(file, "%d\n",params->kernel );
+  FILE *file = fopen(parameters.savename, "w");
 
+  fprintf(file, "%d\n",parameters.kernel );
   fprintf(file, "%d\n",ds->nFeatures );
-
-  int count = 0;
-  for (int i = 0; i < fp->n; i++) {
-    if (fp->alpha[i] > 0.0) {
-      count++;
+  int missed = 0;
+  for (int i = 0; i < fp->q; i++) {
+    if (fp->alpha[fp->inactive[i]] > 0) {
+      missed++;
     }
   }
-  int *active = malloc(sizeof(int)*count);
+  int *missedInds = malloc(sizeof(int)*missed);
   int j = 0;
-  for (int i = 0; i < fp->n; i++) {
-    if (fp->alpha[i] > 0.0) {
-      active[j] = i;
+  for (int i = 0; i < fp->q; i++) {
+    if (fp->alpha[fp->inactive[i]] > 0.0) {
+      missedInds[j] = fp->inactive[i];
       j++;
     }
   }
-  double *h = malloc(sizeof(double)*fp->n*count);
-  double **H = malloc(sizeof(double*)*fp->n);
-  int r = -1;
 
-  for (int i = 0; i < fp->n; i++) {
-    H[i] = &h[i*count];
-  }
-
-  if (params->kernel == LINEAR) {
-    for (int i = 0; i < fp->n; i++) {
-      for (int j = 0; j < count; j++) {
-        H[i][j] = 0.0;
-        for (int k = 0; k < ds->nFeatures; k++) {
-          H[i][j] += ds->data[i][k]*ds->data[active[j]][k];
-        }
-				if( (active[j] < ds->nPos) ^ (i < ds->nPos)  ){
-        	H[i][j] = -H[i][j];
-      	}
-    	}
-		}
-
-    for (int i = 0; i < count; i++) {
-      if (fp->alpha[active[i]] < fp->C*0.99) {
-        r = active[i];
-        break;
-      }
-    }
-    if (r<0) {
-      exit(77);
-    }
-
-    double b = 1.0;
-    for (int i = 0; i < count; i++) {
-			printf("b is %lf\n",b);
-      b -= H[r][i]*fp->alpha[active[i]];
-    }
-			printf("b is %lf\n",b);
-		if(r >= ds->nPos){
-	    b = -b;
-		}
+  if (parameters.kernel == LINEAR) {
     double *w = malloc(sizeof(double)*ds->nFeatures);
 
     for (int i = 0; i < ds->nFeatures; i++) {
       w[i] = 0.0;
-      for (int j = 0; j < count; j++) {
-				if(active[j] < ds->nPos){
-	        w[i] += fp->alpha[active[j]]*ds->data[active[j]][i];
+      for (int j = 0; j < fp->p; j++) {
+				if(fp->active[j] < ds->nPos){
+	        w[i] += fp->alpha[fp->active[j]]*ds->data[fp->active[j]][i];
 				}
 				else{
-	        w[i] -= fp->alpha[active[j]]*ds->data[active[j]][i];
+	        w[i] -= fp->alpha[fp->active[j]]*ds->data[fp->active[j]][i];
 				}
       }
+      for (int j = 0; j < missed; j++) {
+        if(missedInds[j] < ds->nPos){
+          w[i] += ds->data[missedInds[j]][i]*fp->C;
+        }
+        else{
+          w[i] -= ds->data[missedInds[j]][i]*fp->C;
+        }
+      }
     }
-
-
-
-    fprintf(file, "%lf\n",b );
+    printf("%lf\n",ytr );
+    fprintf(file, "%lf\n",ytr );
     for (int i = 0; i < ds->nFeatures; i++) {
       fprintf(file, "%lf\n",w[i] );
     }
     free(w);
 
   }
-  else if(params->kernel == POLYNOMIAL){
-    fprintf(file, "%d\n", count );
-    for (int i = 0; i < fp->n; i++) {
-      for (int j = 0; j < count; j++) {
-        H[i][j] = 0.0;
-        for (int k = 0; k < ds->nFeatures; k++) {
-          H[i][j] += ds->data[i][k]*ds->data[active[j]][k];
-        }
-        H[i][j] = pow(H[i][j]+params->Gamma, params->degree);
-        if(   (active[j] < ds->nPos )  ^  ( i < ds->nPos)  ){
-        	H[i][j] = -H[i][j];
-      	}
-      }
-    }
-    for (int i = 0; i < count; i++) {
-      if (fp->alpha[active[i]] < fp->C*0.99) {
-        r = active[i];
-        break;
-      }
-    }
-    if (r<0) {
-      exit(77);
-    }
+  else if(parameters.kernel == POLYNOMIAL){
+    fprintf(file, "%d\n", fp->p + missed );
 
-    double b = 1.0;
+	  fprintf(file, "%lf\n",ytr );
 
-    for (int i = 0; i < count; i++) {
-      b -= H[r][i]*fp->alpha[active[i]];
-    }
-		if(r>= ds->nPos){
-	    b = -b;
-		}  
-	  fprintf(file, "%lf\n",b );
-
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < fp->p; i++) {
       for (int j = 0; j < ds->nFeatures; j++) {
-        fprintf(file, "%lf\n",ds->data[active[i]][j] );
+        fprintf(file, "%lf\n",ds->data[fp->active[i]][j] );
+      }
+    }
+    for (int i = 0; i < missed; i++) {
+      for (int j = 0; j < ds->nFeatures; j++) {
+        fprintf(file, "%lf\n",ds->data[missedInds[i]][j] );
       }
     }
 
-    for (int i = 0; i < count; i++) {
-			if(active[i] < ds->nPos){
-	      fprintf(file, "%lf\n",fp->alpha[active[i]] );
+    for (int i = 0; i < fp->p; i++) {
+			if(fp->active[i] < ds->nPos){
+	      fprintf(file, "%lf\n",fp->alpha[fp->active[i]] );
   	  }
 			else{
-	      fprintf(file, "%lf\n",-fp->alpha[active[i]] );
+	      fprintf(file, "%lf\n",-fp->alpha[fp->active[i]] );
 			}
   	}
+    for (int i = 0; i < missed; i++) {
+      if(missedInds[i] < ds->nPos){
+        fprintf(file, "%lf\n",fp->C );
+      }
+      else{
+        fprintf(file, "%lf\n",-fp->C );
+      }
+    }
 	}
-  else if(params->kernel == EXPONENTIAL)
+  else if(parameters.kernel == EXPONENTIAL)
   {
-    fprintf(file, "%d\n", count );
-    double x,y;
-    for (int i = 0; i < fp->n; i++) {
-      for (int j = 0; j < count; j++) {
-        y = 0.0;
-        for (int k = 0; k < ds->nFeatures; k++) {
-          x = ds->data[i][k] - ds->data[active[j]][k];
-          y -= x*x;
-        }
-        y *= params->Gamma;
-        H[i][j] = exp(y);
-				if(  (active[j] < ds->nPos  )   ^   (i < ds->nPos)  ){
-        	H[i][j] = -H[i][j];
-      	}
-      }
-    }
-    for (int i = 0; i < count; i++) {
-      if (fp->alpha[active[i]] < fp->C*0.99) {
-        r = active[i];
-        break;
-      }
-    }
-    if (r<0) {
-      exit(77);
-    }
+    fprintf(file, "%d\n", fp->p + missed );
 
-    double b = 1.0;
+    fprintf(file, "%lf\n",ytr );
 
-    for (int i = 0; i < count; i++) {
-			
-      b -= H[r][i]*fp->alpha[active[i]];
-    }
-		if(r>=ds->nPos){
-	    b = -b;
-		}
-    fprintf(file, "%lf\n",b );
-
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < fp->p; i++) {
       for (int j = 0; j < ds->nFeatures; j++) {
-        fprintf(file, "%lf\n",ds->data[active[i]][j] );
+        fprintf(file, "%lf\n",ds->data[fp->active[i]][j] );
+      }
+    }
+    for (int i = 0; i < missed; i++) {
+      for (int j = 0; j < ds->nFeatures; j++) {
+        fprintf(file, "%lf\n",ds->data[missedInds[i]][j] );
       }
     }
 
-    for (int i = 0; i < count; i++) {
-			if(active[i] < ds->nPos){
-	      fprintf(file, "%lf\n",fp->alpha[active[i]] );
+    for (int i = 0; i < fp->p; i++) {
+			if(fp->active[i] < ds->nPos){
+	      fprintf(file, "%lf\n",fp->alpha[fp->active[i]] );
   	  }
 			else{
-	      fprintf(file, "%lf\n",-fp->alpha[active[i]] );
+	      fprintf(file, "%lf\n",-fp->alpha[fp->active[i]] );
   	  }
   	}
+    for (int i = 0; i < missed; i++) {
+      if(missedInds[i] < ds->nPos){
+        fprintf(file, "%lf\n",fp->C );
+      }
+      else{
+        fprintf(file, "%lf\n",-fp->C );
+      }
+    }
 	}
-  free(active);
-  free(h);
-  free(H);
+  free(missedInds);
   fclose(file);
 }
 
-void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params)
+void testSavedModel(struct denseData *ds, char* fn)
 {
   FILE *fp = fopen(fn, "r");
   int k;
@@ -349,7 +291,7 @@ void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params)
 		}
     free(w);
   }
-  else if(params->kernel == POLYNOMIAL)  {
+  else if(parameters.kernel == POLYNOMIAL)  {
     int count;
     res = fscanf(fp, "%d", &count);
     res = fscanf(fp, "%lf", &b);
@@ -376,7 +318,7 @@ void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params)
         for (int k = 0; k < ds->nFeatures; k++) {
           contrib += X[j][k]*ds->data[i][k];
         }
-        contrib = pow(contrib + params->Gamma, params->degree);
+        contrib = pow(contrib + parameters.Gamma, parameters.degree);
         value += alphaY[j]*contrib;
       }
 			if(i<ds->nPos){
@@ -399,7 +341,7 @@ void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params)
     	}
     }
   }
-  else if(params->kernel == EXPONENTIAL)  {
+  else if(parameters.kernel == EXPONENTIAL)  {
     int count;
     res = fscanf(fp, "%d", &count);
     res = fscanf(fp, "%lf", &b);
@@ -428,7 +370,7 @@ void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params)
           y = X[j][k] - ds->data[i][k];
           contrib -= y*y;
         }
-        contrib *= params->Gamma;
+        contrib *= parameters.Gamma;
         value += alphaY[j]*exp(contrib);
       }
 			if(i<ds->nPos){
@@ -460,7 +402,9 @@ void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params)
 
 }
 int readline(FILE *input, char **line)
-/* Function to read lines from file */
+/* Function to read lines from file. Returns 1 upon successful reading
+ *  and 0 if read is unsuccessful/file ends.
+ */
 {
   int len;
   int max_line_len = 1024;
@@ -482,48 +426,48 @@ int readline(FILE *input, char **line)
   return 1;
 }
 
-int parse_arguments(int argc, char *argv[], char** filename, struct svm_args *parameters)
+int parse_arguments(int argc, char *argv[], char** filename)
 /* Function to parse command line arguments with getopt */
 {
   int c;
 
   // Default values set:
-  parameters->kernel = 0;
-  parameters->degree = 1;
-  parameters->verbose = 0;
-  parameters->C = 1;
-  parameters->test = 0;
-  parameters->modelfile = NULL;
-  parameters->save = 0;
-  parameters->savename = NULL;
-  parameters->Gamma = 1;
+  parameters.kernel = 0;
+  parameters.degree = 1;
+  parameters.verbose = 0;
+  parameters.C = 1;
+  parameters.test = 0;
+  parameters.modelfile = NULL;
+  parameters.save = 0;
+  parameters.savename = NULL;
+  parameters.Gamma = 1;
   while ((c = getopt( argc, argv, "f:k:t:c:d:vhs:g:")) != -1){
     switch (c) {
       case 'f':
         *filename = optarg;
         break;
       case 'k':
-        parameters->kernel = atoi(optarg);
+        parameters.kernel = atoi(optarg);
         break;
       case 'c':
-        parameters->C = atof(optarg);
+        parameters.C = atof(optarg);
         break;
       case 't':
-        parameters->test = 1;
-        parameters->modelfile = optarg;
+        parameters.test = 1;
+        parameters.modelfile = optarg;
         break;
       case 'd':
-        parameters->degree = atoi(optarg);
+        parameters.degree = atoi(optarg);
         break;
       case 's':
-        parameters->save = 1;
-        parameters->savename = optarg;
+        parameters.save = 1;
+        parameters.savename = optarg;
         break;
       case 'v':
-        parameters->verbose = 1;
+        parameters.verbose = 1;
         break;
       case 'g':
-        parameters->Gamma = atof(optarg);
+        parameters.Gamma = atof(optarg);
         break;
       case 'h':
         printf("I was supposed to put in a help message here.\n");
@@ -532,13 +476,15 @@ int parse_arguments(int argc, char *argv[], char** filename, struct svm_args *pa
   }
 
   if (*filename == NULL) {
-    printf("io.cpp: parse_arguments: no input file selected.\n");
+    printf("io.c: parse_arguments(): no input file selected.\n");
     exit(1);
   }
   return 0;
 }
 
 void preprocess(struct denseData *ds)
+/*  Function provides an option to normalise the input data.
+ */
 {
   double* means = (double*)calloc(ds->nFeatures,sizeof(double));
   double* stdDev = (double*)calloc(ds->nFeatures,sizeof(double));
@@ -552,6 +498,9 @@ void preprocess(struct denseData *ds)
 
 
 void calcMeans(double *mean, struct denseData *ds)
+/*  Function to calculate the mean of each feature of the input data if
+ *  normalisation required.
+ */
 {
   for (int i = 0; i < ds->nInstances; i++) {
     for (int j = 0; j < ds->nFeatures; j++) {
@@ -564,6 +513,7 @@ void calcMeans(double *mean, struct denseData *ds)
 }
 
 void normalise(double* mean, double* stdDev, struct denseData* ds)
+/*  Function to normalise the data. */
 {
   for (int i = 0; i < ds->nInstances; i++) {
     for (int j = 0; j < ds->nFeatures; j++) {
@@ -574,6 +524,7 @@ void normalise(double* mean, double* stdDev, struct denseData* ds)
 }
 
 void calcStdDev(double* stdDev, double* mean, struct denseData *ds)
+/* Function to calculate the standard deviation of each feature in ds. */
 {
   for (int i = 0; i < ds->nInstances; i++) {
     for (int j = 0; j < ds->nFeatures; j++) {
@@ -583,38 +534,4 @@ void calcStdDev(double* stdDev, double* mean, struct denseData *ds)
   for (int i = 0; i < ds->nFeatures; i++) {
     stdDev[i] = sqrt(stdDev[i]/((double)(ds->nInstances)-1.0));
   }
-}
-
-
-void cleanData( struct denseData *ds){
-  for (int i = 0; i < ds->nInstances - 1; i++) {
-    printf("%d\n",i );
-    for (int j = i; j < ds->nInstances; j++) {
-      int flag = 1;
-      double check;
-      double previous = ds->data[i][0]/ds->data[j][0];
-      for (int k = 1; k < ds->nFeatures; k++) {
-        check = ds->data[i][k]/ds->data[j][k];
-        printf("%lf and %lf\n",previous,check );
-        if (fabs(check - previous) > 0.0001 ) {
-          flag = 0;
-          break;
-        }
-        previous = check;
-      }
-      if (flag == 1) {
-        printf("%d is broken\n",j );
-      }
-    }
-  }
-}
-
-
-void freeDenseData(struct denseData *ds)
-/* Function to free dynamically allocated memory in dense data set struct. */
-{
-  free(ds->data);
-  free(ds->data1d);
-  free(ds->instanceLabels);
-  free(ds->featureLabels);
 }

@@ -5,27 +5,35 @@
 #define POLYNOMIAL 		1
 #define EXPONENTIAL		2
 
+/*      svm.h -- header file containing structures needed for gertSVM algorithm.
+ *
+ *      Author:     John Cormican
+ *
+ */
+
+
+//Cell structure for linked list:
 typedef struct Cell_struct
 {
   struct Cell_struct* next;
   struct Cell_struct* prev;
   int label;
   double*  line;
-}
-Cell;
+} Cell;
 
+//List structure used in linked.c
 typedef struct
 {
   struct Cell_struct* head;
   struct Cell_struct* tail;
-}
-List;
+} List;
 
-struct svm_args
+//Command Line Arguments struct for args passed through the command line.
+typedef struct svm_args
 {
 	int kernel;
 	int degree;
-	double C;	/* for C_SVC, EPSILON_SVR and NU_SVR */
+	double C;
 	double Gamma;
 	int verbose;
 	int test;
@@ -34,38 +42,18 @@ struct svm_args
 	char* savename;
 } clargs;
 
-
-struct denseData{
+// denseData structure for storing dataset
+typedef struct denseData{
   int nInstances;
   int nFeatures;
 	int nPos;
 	int nNeg;
   double** data;
   double* data1d;
-  char** instanceLabels;
-  char** featureLabels;
-};
+} dataSet;
 
-struct CGSLSProj{
-	// Re-inited each time:
-	double* alphaHat;
-	double* yHat;
-	double* rHat;
-	double** H;
-
-	// Will be set during CG iterations
-	double* gamma;
-	double* rho;
-	double* Hrho;
-
-	// Changed independent (p size, ytr calc) or unchanging
-	int p;
-	double C;
-	double* h;
-	double ytr;
-};
-
-struct Projected{
+// Projected struct for the projected subproblem
+typedef struct Projected{
 	// Re-inited each time:
 	double* alphaHat;
 	double* yHat;
@@ -84,7 +72,8 @@ struct Projected{
 	double ytr;
 }Subproblem;
 
-struct Fullproblem{
+// Full problem struct for everything to be solved by the algorithm.
+typedef struct Fullproblem{
 	int n;
 	int p;
 	int q;
@@ -99,7 +88,7 @@ struct Fullproblem{
 	int* inactive;
 
 	List partialH;
-} fullprob;
+} Bigprob;
 
 struct svm_args parameters;
 

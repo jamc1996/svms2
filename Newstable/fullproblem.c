@@ -1,5 +1,17 @@
 #include "fullproblem.h"
 
+/*      fullproblem.c -- program with functions for solving the full problem
+ *                        and monitoring the elements in need of optimisation.
+ *
+ *      Author:     John Cormican
+ *
+ *      Purpouse:   To store the solution vector alpha and manage selection of
+ *                  elements for optimisation.
+ *
+ *      Usage:      Various functions called from algorithm.c.
+ *
+ */
+
 void alloc_prob(struct Fullproblem *prob, struct denseData *ds, int p)
 /* Function to allocate space necessary for a full problem of size n,
  * that will be projected to size p.  */
@@ -162,6 +174,7 @@ void findWorst(int *worst, int* target, int* change, int *n, struct denseData *d
 }
 
 void spreadChange(struct denseData *ds, struct Fullproblem *fp, struct Projected *sp, int target, double diff, int change, int n)
+/* Function to distribute a change in one element across the active set. */
 {
   //Change inactive gradF due to changes in alpha[active != n]
   Cell *temp = fp->partialH.head;
@@ -313,6 +326,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
 }
 
 int checkfpConstraints(struct Fullproblem *fp)
+/* Function to check if the constraints are still active. */
 {
   for (int i = 0; i < fp->p; i++) {
     if(fp->alpha[fp->active[i]]>fp->C){
@@ -326,6 +340,9 @@ int checkfpConstraints(struct Fullproblem *fp)
 }
 
 void adjustGradF(struct Fullproblem *fp, struct denseData *ds, struct Projected *sp, int n, int worst, int signal, int target, int flag, struct svm_args *params, double diff)
+/*  Function make the necessary adjustments in gradF if swapping values out of
+ *  active set.
+ */
 {
   // updatee based on change of H matrix:
   double* nline = findListLine(fp->partialH,fp->active[n]);
@@ -397,6 +414,7 @@ void adjustGradF(struct Fullproblem *fp, struct denseData *ds, struct Projected 
 }
 
 void reinitprob(struct denseData *ds, struct Fullproblem *fp, struct Projected *sp, int add, int* temp, int* temp2)
+/* Function to re-initialize the full problem values after a change in p */
 {
   for (int i = 0; i < add; i++) {
     fp->active[(fp->p - add) + i] = temp[i];
@@ -420,6 +438,7 @@ void reinitprob(struct denseData *ds, struct Fullproblem *fp, struct Projected *
 }
 
 void shrinkSize( struct Fullproblem *fp, struct Projected *sp, int k)
+/* Function to shrink the problem size p. */
 {
 
   int temp = fp->active[k];
@@ -470,6 +489,7 @@ void shrinkSize( struct Fullproblem *fp, struct Projected *sp, int k)
 }
 
 void changeP( struct Fullproblem *fp, struct Projected *sp, int add)
+/* Function to reallocate space for an increase in problem size. */
 {
   fp->p += add;
   fp->q -= add;
@@ -496,7 +516,8 @@ void changeP( struct Fullproblem *fp, struct Projected *sp, int add)
   }
 }
 
-int findWorstest(struct Fullproblem *fp , int add, int* temp, int* temp2)
+int findWorstAdd(struct Fullproblem *fp , int add, int* temp, int* temp2)
+/* Function to find the worst beta values to add the active set. */
 {
   double *betaVal = malloc(sizeof(double)*add);
   for (int i = 0; i < add; i++) {

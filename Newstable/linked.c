@@ -1,6 +1,24 @@
 #include "linked.h"
 
+/*
+
+ *      DISCLAIMER: THE FUNCTIONS IN THIS PROGRAM WERE ADAPTED FOR THIS
+ *      ALGORITHM WERE ADAPTED FROM MY SOLUTION TO ASSIGNMENT 4 IN MA5613
+ *      TAUGHT BY MIKE PEARDON.
+
+ *      linked.c -- program with functions for solving the projected
+ *                        sub problem using the conjugate gradient method.
+ *
+ *      Author:     John Cormican
+ *
+ *      Purpouse:   To manage the conjugate gradient algorithm on the subproblem.
+ *
+ *      Usage:      Various functions called from algorithm.c.
+ *
+ */
+
 double* findListLineSetLabel(List l, int n , int newLabel)
+/* Function to find a list line with a given label and change its label. */
 {
   Cell* temp = l.head;
   while (temp != NULL) {
@@ -15,6 +33,7 @@ double* findListLineSetLabel(List l, int n , int newLabel)
 }
 
 double* findListLine(List l, int n)
+/* Function to find a list line with a given label. */
 {
   Cell* temp = l.head;
   while (temp != NULL) {
@@ -49,10 +68,8 @@ List Init_Empty_List()
 
 
 List append(struct denseData *ds, List l, int n)
-/* Function to append a linked list with a new string. */
+/* Function to append a linked list with a new line. */
 {
-  printf("n is %d\n",n );
-
   // Check if l.head, l.tail have words:
   if (l.head->line == NULL)
   {
@@ -99,7 +116,6 @@ void print_list(List l)
       l.head->prev = NULL;
       return;
     }
-    printf("%lf\n",l.head->prev->line[0] );
     l.head->prev = l.head->prev->next;
   }
 }
@@ -140,7 +156,7 @@ List delete(int find, List l)
     }
     else
     {
-      printf("Word not found.\n");
+      fprintf(stderr,"Line %d not found.\n",find);
       exit(1);
     }
   }
@@ -150,8 +166,8 @@ List delete(int find, List l)
   {
     if (l.head->prev == NULL)
     {
-      printf("Word not found.\n");
-      exit(191);
+      fprintf(stderr,"Line %d not found.\n",find);
+      exit(1);
     }
     l.head->prev = l.head->prev->next;
   }
