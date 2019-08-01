@@ -51,6 +51,10 @@ List Init_Empty_List()
 List append(struct denseData *ds, List l, int n)
 /* Function to append a linked list with a new string. */
 {
+	if(n>ds->procInstances){
+		fprintf(stderr,"linked.c: invalid index (%d) appended\n",n);
+		exit(1);
+	}
   // Check if l.head, l.tail have words:
   if (l.head->line == NULL)
   {

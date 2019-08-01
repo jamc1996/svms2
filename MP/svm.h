@@ -5,6 +5,8 @@
 #define POLYNOMIAL 		1
 #define EXPONENTIAL		2
 
+#define nThreads 4
+
 typedef struct Cell_struct
 {
   struct Cell_struct* next;
@@ -48,13 +50,8 @@ struct denseData{
 	int posStart;
 	int negStart;
 
-	int* global;
-
   double** data;
   double* data1d;
-	double* y;
-  char** instanceLabels;
-  char** featureLabels;
 };
 
 struct CGSLSProj{
@@ -79,7 +76,7 @@ struct CGSLSProj{
 struct Projected{
 	// Re-inited each time:
 	double* alphaHat;
-	double* yHat;
+	int* yHat;
 	double* rHat;
 	double** H;
 
@@ -111,6 +108,17 @@ struct Fullproblem{
 
 	List partialH;
 } fullprob;
+
+struct receiveData{
+	int total;
+	double ytr;
+	double *alpha;
+
+	double *data1d;
+	double **data;
+
+	double *w;
+};
 
 struct svm_args parameters;
 

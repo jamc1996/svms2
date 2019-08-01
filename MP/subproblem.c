@@ -6,10 +6,10 @@ void alloc_subprob(struct Projected *sp, int p)
  */
 {
   sp->p = p;
-  sp->C = 200.0;
+  sp->C = 50.0;
 
   sp->alphaHat = malloc(sizeof(double)*p);
-  sp->yHat = malloc(sizeof(double)*p);
+  sp->yHat = malloc(sizeof(int)*p);
   sp->rHat = malloc(sizeof(double)*p);
   sp->gamma = malloc(sizeof(double)*p);
   sp->rho = malloc(sizeof(double)*p);
@@ -35,10 +35,15 @@ void init_subprob(struct Projected *sp, struct Fullproblem *fp, struct denseData
  */
 {
   for (int i = 0; i < sp->p; i++) {
-    sp->yHat[i] = ds->y[ds->global[fp->active[i]]];
+    if(fp->active[i] < ds->procPos){
+			sp->yHat[i] = 1;
+    }else{
+			sp->yHat[i] = -1;
+		}
     sp->alphaHat[i] = 0.0;    // This is the change from original
     sp->rHat[i] = fp->gradF[fp->active[i]];
   }
+
   if (newRows) {
     updateSubH(fp, sp, ds, params);
   }
@@ -53,9 +58,9 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
 
   double newRSQ;
   int problem = 0;
-
-
   int its = 0;;
+
+
   while (rSq > 0.000000001) {
     its++;
     if(its % 1000 == 0){
@@ -90,20 +95,14 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
     }
 
     updateGamma(sp, lambda);
-
     newRSQ = inner_prod(sp->gamma, sp->gamma, sp->p);
 
     mu = newRSQ/rSq;
 
     linearOp2(sp->rho, sp->gamma, mu, sp->p);
-
     rSq = newRSQ;
 
   }
-
-	for(int i=0; i<sp->p; i++){
-		printf("alf %lf\n",sp->alphaHat[i]);
-	}
 
   return 0;
 }
@@ -112,6 +111,7 @@ void calcYTR(struct Projected *sp, struct Fullproblem *fp)
 /* Function to calculate the innter product of the projected*/
 {
   sp->ytr = 0.0;
+	#pragma omp parallel for
   for (int i = 0; i < sp->p; i++) {
     sp->ytr += sp->yHat[i]*fp->gradF[fp->active[i]];
   }
@@ -120,6 +120,7 @@ void calcYTR(struct Projected *sp, struct Fullproblem *fp)
 
 void linearOp2(double* vecOut, double* vecIn, double a, int p)
 {
+	#pragma omp parallel for
   for (int i = 0; i < p; i++) {
     vecOut[i] *= a;
     vecOut[i] += vecIn[i];
@@ -128,12 +129,15 @@ void linearOp2(double* vecOut, double* vecIn, double a, int p)
 
 void updateGamma(struct Projected *sp, double lambda)
 {
+	#pragma omp parallel for
   for (int i = 0; i < sp->p; i++) {
     sp->Hrho[i]*=lambda;
   }
+	int j;
+	#pragma omp parallel for private(j)
   for (int i = 0; i < sp->p; i++) {
     sp->gamma[i] -= sp->Hrho[i];
-    for (int j = 0; j < sp->p; j++) {
+    for (j = 0; j < sp->p; j++) {
       sp->gamma[i] += sp->yHat[i]*sp->yHat[j]*sp->Hrho[j]/((double)sp->p);
     }
   }
@@ -151,12 +155,14 @@ void linearOp(double* vecOut, double* vecIn, double a, int p)
 void calc_Hrho(struct Projected *sp)
 /* Function to multiply rho by H */
 {
+	int j;
+	#pragma omp parallel for private(j)
   for (int i = 0; i < sp->p; i++) {
     sp->Hrho[i] = 0.0;
-    for (int j = 0; j < i; j++) {
+    for (j = 0; j < i; j++) {
       sp->Hrho[i] += sp->H[j][i]*sp->rho[j];
     }
-    for (int j = i; j < sp->p; j++) {
+    for (j = i; j < sp->p; j++) {
       sp->Hrho[i] += sp->H[i][j]*sp->rho[j];
     }
   }
@@ -225,12 +231,14 @@ void copy_vector(double* a, double* b, int p)
   }
 }
 
-void constraint_projection(double* vecOut, double* vecIn, double* y, int p)
+void constraint_projection(double* vecOut, double* vecIn, int* y, int p)
 {
+	int j;
+	#pragma omp parallel for private(j)
   for (int i = 0; i < p; i++) {
     vecOut[i] = vecIn[i];
-    for (int j = 0; j < p; j++) {
-      vecOut[i] -= vecIn[j]*(y[i]*y[j]/((double)p));
+    for (j = 0; j < p; j++) {
+vecOut[i] -= vecIn[j]*((y[i]*y[j])/((double)p));
     }
   }
 }

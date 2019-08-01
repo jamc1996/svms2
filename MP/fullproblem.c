@@ -8,7 +8,7 @@ void alloc_prob(struct Fullproblem *prob, struct denseData *ds, int p)
   prob->n = ds->procInstances;
   prob->p = p;
   prob->q = prob->n-prob->p;
-  prob->C = 200.0;
+  prob->C = 50.0;
 
   prob->alpha = (double*)calloc(prob->n, sizeof(double) );
   prob->gradF = (double*)malloc(sizeof(double)*prob->n);
@@ -17,17 +17,19 @@ void alloc_prob(struct Fullproblem *prob, struct denseData *ds, int p)
   prob->beta = (double*)malloc(sizeof(double)*(prob->q));
   prob->partialH = Init_Empty_List();
 
-	printf("done\n");
 
 }
+
+
 
 void init_prob(struct Fullproblem *prob, struct denseData *ds)
 /* Function to initialize values for full problem of size n,
  * that will be projected to size p.  */
 {
-  for (int i = 0; i < prob->n; i++) {
-    prob->gradF[i] = 1.0;
-  }
+ 	for (int i = 0; i < prob->n; i++) {
+ 	  prob->gradF[i] = 1.0;
+ 	}
+
   for (int i = 0; i < prob->p/2; i++) {
     prob->active[i] = i;
   }
@@ -41,7 +43,7 @@ void init_prob(struct Fullproblem *prob, struct denseData *ds)
       prob->inactive[i-(prob->p/2)] = i;
     }
     for (int i = 1+(prob->p/2); i < ds->procNeg; i++) {
-      prob->inactive[ds->procPos-(prob->p)+i] = ds->procPos + i;
+      prob->inactive[ds->procPos+i-(prob->p)] = ds->procPos + i;
     }
   }
   else{
@@ -52,6 +54,7 @@ void init_prob(struct Fullproblem *prob, struct denseData *ds)
       prob->inactive[ds->procPos-(prob->p)+i] = ds->procPos + i;
     }
   }
+
   for (int i = 0; i < prob->p; i++) {
     prob->partialH = append(ds,prob->partialH,prob->active[i]);
 	}
@@ -98,14 +101,23 @@ void updateAlphaR(struct Fullproblem *fp, struct Projected *sp)
 void calculateBeta(struct Fullproblem *fp, struct Projected *sp, struct denseData *ds)
 /* Function to calculate the beta vector - tracks how suboptimal the values for*/
 {
-  for (int i = 0; i < fp->q; i++) {
-    if (fp->alpha[fp->inactive[i]] < 0.0000000001) {
-      fp->beta[i] =  - fp->gradF[fp->inactive[i]] + (ds->y[ds->global[fp->inactive[i]]]*sp->ytr);
-    }
-    else if (fp->alpha[fp->inactive[i]] >= sp->C - 0.001) {
-      fp->beta[i] =  fp->gradF[fp->inactive[i]] - ds->y[ds->global[fp->inactive[i]]]*sp->ytr;
-    }
-  }
+	for (int i = 0; i < fp->q; i++) {
+		if (fp->alpha[fp->inactive[i]] < 0.0000000001) {
+			if(fp->inactive[i] < ds->procPos) {
+				fp->beta[i] =  - fp->gradF[fp->inactive[i]] + (sp->ytr);
+ 			}else{
+				fp->beta[i] =  - fp->gradF[fp->inactive[i]] - (sp->ytr);
+			}
+		}
+		else if (fp->alpha[fp->inactive[i]] >= sp->C - 0.001) {
+			if(fp->inactive[i] < ds->procPos){
+	      			fp->beta[i] =  fp->gradF[fp->inactive[i]] - (sp->ytr);
+  	  		}else{
+	      			fp->beta[i] =  fp->gradF[fp->inactive[i]] + (sp->ytr);
+			}
+		}
+	}
+
 }
 
 void findWorst(int *worst, int* target, int* change, int *n, struct denseData *ds, struct Fullproblem *fp)
@@ -129,39 +141,45 @@ void findWorst(int *worst, int* target, int* change, int *n, struct denseData *d
       (*change) = 1;
     }
   }
-  *target = ds->y[fp->active[*n]]*(*change);
+	if(fp->active[*n] < ds->procPos){
+		*target = (*change);
+	}
+	else{
+		*target = -(*change);
+	}
 
-  for (int i = 0; i < fp->q; i++) {
-    if( ds->y[ds->global[fp->inactive[i]]] == *target )  {
-      if (fp->beta[i] < tester) {
-        if (fp->alpha[fp->inactive[i]] < fp->C*0.8){
-          *worst = i;
-          tester = fp->beta[i];
-        }
-      }
-    }
-    if( ds->y[ds->global[fp->inactive[i]]] != *target )  {
-      if (fp->beta[i] < tester) {
-        if (fp->alpha[fp->inactive[i]] > 0.1){
-          *worst = i;
-          tester = fp->beta[i];
-        }
-      }
-    }
-  }
-  if (tester > 0.0) {
-    *worst = -1;
-  }
+	for (int i = 0; i < fp->q; i++) {
+		if( (fp->inactive[i] < ds->procPos && *target == 1) || (ds->procPos <= fp->inactive[i] && *target == -1) ) {
+			if (fp->beta[i] < tester) {
+				if (fp->alpha[fp->inactive[i]] < fp->C*0.8){
+					*worst = i;
+					tester = fp->beta[i];
+				}
+			}
+		}
+		else{
+			if (fp->beta[i] < tester) {
+        			if (fp->alpha[fp->inactive[i]] > 0.1){
+					*worst = i;
+					tester = fp->beta[i];
+				}
+			}
+		}
+	}
+	if (tester > 0.0) {
+		*worst = -1;
+	}
 }
 
 void spreadChange(struct denseData *ds, struct Fullproblem *fp, struct Projected *sp, int target, double diff, int change, int n)
 {
   //Change inactive gradF due to changes in alpha[active != n]
   Cell *temp = fp->partialH.head;
+  int i = 0;
   while (temp != NULL) {
     for (int j = 0; j < fp->q; j++) {
       if (temp->label != fp->active[n]) {
-        if (ds->y[ds->global[temp->label]] == target){
+        if (sp->yHat[i] == target){
           fp->gradF[fp->inactive[j]] -= temp->line[fp->inactive[j]]*diff/(double)(fp->p-1);
         }
         else{
@@ -170,14 +188,14 @@ void spreadChange(struct denseData *ds, struct Fullproblem *fp, struct Projected
       }
     }
   temp = temp->next;
-
+	i++;
   }
 
   // Change active gradF due to changes in alpha[active != n]
   for (int i = 0; i < fp->p; i++) {
     for (int j = 0; j < fp->p; j++) {
       if (j != n) {
-        if (ds->y[ds->global[fp->active[j]]] == target){
+        if (sp->yHat[j] == target){
           if (i<j) {
             fp->gradF[fp->active[i]] -= sp->H[i][j]*diff/(double)(fp->p-1);
           }
@@ -213,7 +231,7 @@ void spreadChange(struct denseData *ds, struct Fullproblem *fp, struct Projected
   // Minor alpha changes
   for (int j = 0; j < fp->p; j++) {
     if (j != n) {
-      if (ds->y[ds->global[fp->active[j]]] == target){
+      if (sp->yHat[j] == target){
         fp->alpha[fp->active[j]] += diff/(double)(fp->p-1);
       }
       else{
@@ -231,7 +249,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
   if (n>0) {
     flag = 1;
   }
-
+printf("n is %d\n",n);
   int worst = -1;
   int target, change=1;
 
@@ -245,7 +263,6 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
   else{
     diff = change*fp->alpha[fp->active[n]];
   }
-
 
   if( worst < 0)
   {
@@ -264,7 +281,8 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
   int temp = fp->active[n];
   if (flag)
   {
-    if (ds->y[ds->global[fp->inactive[worst]]] == target) {
+ if ( (fp->inactive[worst] < ds->procPos && target > 0) || (fp->inactive[worst] >= ds->procPos && target < 0) ) {
+	printf("a diff %lf\n",diff);
       adjustGradF(fp, ds, sp, n, worst, change, 1, flag, params, diff);
       fp->alpha[fp->inactive[worst]] += diff;
       fp->alpha[fp->active[n]] = sp->C;
@@ -273,6 +291,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
       fp->beta[worst] = DBL_MAX;
     }
     else{
+	printf("b\n");
       adjustGradF(fp, ds, sp, n, worst, change, 0, flag, params, diff);
       fp->alpha[fp->inactive[worst]] -= diff;
       fp->alpha[fp->active[n]] = sp->C;
@@ -283,7 +302,8 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
   }
   else
   {
-    if (ds->y[ds->global[fp->inactive[worst]]] == target) {
+ if ( (fp->inactive[worst] < ds->procPos && target > 0) || (fp->inactive[worst] >= ds->procPos && target < 0) ) {
+	printf("c\n");
       adjustGradF(fp, ds, sp, n, worst, change, 1, flag, params, diff);
       fp->alpha[fp->inactive[worst]] += diff;
       fp->alpha[fp->active[n]] = 0.0;//sp->C ;
@@ -292,6 +312,7 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
       fp->beta[worst] = DBL_MAX-1.0;
     }
     else {
+	printf("d\n");
       adjustGradF(fp, ds, sp, n, worst, change, 0, flag, params, diff);
       fp->alpha[fp->inactive[worst]] -= diff;
       fp->alpha[fp->active[n]] = 0.0;//sp->C ;
@@ -437,7 +458,7 @@ void shrinkSize( struct Fullproblem *fp, struct Projected *sp, int k)
   sp->p--;
 
   sp->alphaHat = realloc(sp->alphaHat,sizeof(double)*sp->p);
-  sp->yHat = realloc(sp->yHat,sizeof(double)*sp->p);
+  sp->yHat = realloc(sp->yHat,sizeof(int)*sp->p);
   sp->rHat = realloc(sp->rHat,sizeof(double)*sp->p);
   sp->gamma = realloc(sp->gamma,sizeof(double)*sp->p);
   sp->rho = realloc(sp->rho,sizeof(double)*sp->p);
@@ -473,9 +494,8 @@ void changeP( struct Fullproblem *fp, struct Projected *sp, int add)
   fp->inactive = realloc(fp->inactive,sizeof(int)*fp->q);
   fp->beta = realloc(fp->beta,sizeof(double)*fp->q);
 
-	printf("Here\n");
   sp->alphaHat = realloc(sp->alphaHat,sizeof(double)*sp->p);
-  sp->yHat = realloc(sp->yHat,sizeof(double)*sp->p);
+  sp->yHat = realloc(sp->yHat,sizeof(int)*sp->p);
   sp->rHat = realloc(sp->rHat,sizeof(double)*sp->p);
   sp->gamma = realloc(sp->gamma,sizeof(double)*sp->p);
   sp->rho = realloc(sp->rho,sizeof(double)*sp->p);

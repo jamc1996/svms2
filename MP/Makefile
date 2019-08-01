@@ -2,7 +2,7 @@ CPC = g++
 CC = gcc
 MPCC = mpicc
 CPFLAGS = -Wall -std=c++11
-CFLAGS = -Wall -std=c99
+CFLAGS = -Wall -std=c99 -fopenmp
 
 objects = main.o io.o fullproblem.o subproblem.o kernels.o linked.o
 
@@ -63,4 +63,4 @@ testExp: gert
 
 testMP: gert
 	module load cports openmpi;\
-	mpiexec -n 4 ./gert -f alt.txt -s multiTrain.txt
+	mpiexec -n 2 ./gert -f alt.txt -s multiTrain.txt

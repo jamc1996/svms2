@@ -1,20 +1,24 @@
 #include "kernels.h"
 
-
+/*
 int setH(struct Fullproblem *prob, struct denseData *ds, struct svm_args *params)
 /*  Function to update the values of the matrix partialH
- *  TO DO -> ALLOW ONLY UPDATE THE SWAPPED OUT VALUES - or not?   */
+ *  TO DO -> ALLOW ONLY UPDATE THE SWAPPED OUT VALUES - or not?   
 {
   Cell *temp = prob->partialH.head;
   int i = 0;
+	int k;
   if (params->kernel == LINEAR) {
     while(temp != NULL) {
+			#pragma omp parallel for private(k)
       for (int j = 0; j < prob->n; j++) {
         temp->line[j] = 0.0;
-        for (int k = 0; k < ds->nFeatures; k++) {
+        for (k = 0; k < ds->nFeatures; k++) {
           temp->line[j] += ds->data[j][k]*ds->data[prob->active[i]][k];
         }
-        temp->line[j] *= ds->y[prob->active[i]]*ds->y[j];
+	if(j<ds->procPos ^ temp->label < ds->procPos ){
+        	temp->line[j] = -temp->line[j];
+	}	
       }
       temp = temp->next;
       i++;
@@ -28,7 +32,9 @@ int setH(struct Fullproblem *prob, struct denseData *ds, struct svm_args *params
           temp->line[j] += ds->data[j][k]*ds->data[prob->active[i]][k];
         }
         temp->line[j] = pow(temp->line[j]+params->Gamma, params->degree);
-        temp->line[j] *= ds->y[prob->active[i]]*ds->y[j];
+       	if(j<ds->procPos ^ temp->label < ds->procPos ){
+        	temp->line[j] = -temp->line[j];
+	}
       }
       i++;
       temp = temp->next;
@@ -45,7 +51,10 @@ int setH(struct Fullproblem *prob, struct denseData *ds, struct svm_args *params
           y -= x*x;
         }
         y *= params->Gamma;
-        temp->line[j] = exp(y)*ds->y[prob->active[i]]*ds->y[j];
+        temp->line[j] = exp(y);
+       	if(j<ds->procPos ^ temp->label < ds->procPos ){
+        	temp->line[j] = -temp->line[j];
+	}
       }
       i++;
       temp = temp->next;
@@ -56,7 +65,7 @@ int setH(struct Fullproblem *prob, struct denseData *ds, struct svm_args *params
   }
   return 0;
 }
-
+*/
 int updateSubH(struct Fullproblem *fp, struct Projected *sp, struct denseData *ds, struct svm_args *params)
 {
   Cell* temp = fp->partialH.head;
@@ -72,75 +81,198 @@ int updateSubH(struct Fullproblem *fp, struct Projected *sp, struct denseData *d
   return 0;
 }
 
-void appendUpdate(struct denseData *ds, double *line, int n)
+void MPIappendUpdate(struct denseData *ds, struct Fullproblem *fp, double *line, int n)
 {
-	printf("uh, oh\n");
+	int j;
   if (parameters.kernel == LINEAR) {
-    for (int i = 0; i < ds->procInstances; i++) {
+		#pragma omp parallel for private(j)
+    for (int i = 0; i < fp->p; i++) {
       line[i] = 0.0;
-      for (int j = 0; j < ds->nFeatures; j++) {
-        line[i] += ds->data[ds->global[i]][j]*ds->data[ds->global[n]][j];
+      for ( j = 0; j < ds->nFeatures; j++) {
+        line[i] += ds->data[fp->active[i]][j]*ds->data[n][j];
       }
-      line[i]*= ds->y[ds->global[i]]*ds->y[ds->global[n]];
+			if( (i<ds->procPos) ^  ( n < ds->procPos  ) ){
+        	line[i] = -line[i];
+			}
     }
   }
   if (parameters.kernel == POLYNOMIAL) {
-    for (int i = 0; i < ds->procInstances; i++) {
+		#pragma omp parallel for private(j)
+    for (int i = 0; i < fp->p; i++) {
       line[i] = 0.0;
-      for (int j = 0; j < ds->nFeatures; j++) {
-        line[i] += ds->data[ds->global[i]][j]*ds->data[ds->global[n]][j];
+      for ( j = 0; j < ds->nFeatures; j++) {
+        line[i] += ds->data[fp->active[i]][j]*ds->data[n][j];
       }
       line[i] = pow(line[i]+parameters.Gamma, parameters.degree);
-      line[i]*= ds->y[ds->global[i]]*ds->y[ds->global[n]];
+	if((i<ds->procPos) ^ (n < ds->procPos) ){
+        	line[i] = -line[i];
+	}
     }
   }
   else if (parameters.kernel == EXPONENTIAL) {
     double x,y;
+		#pragma omp parallel for private(j)
     for (int i = 0; i < ds->procInstances; i++) {
       y = 0.0;
-      for (int j = 0; j < ds->nFeatures; j++) {
-        x = ds->data[ds->global[i]][j] - ds->data[ds->global[n]][j];
+      for ( j = 0; j < ds->nFeatures; j++) {
+        x = ds->data[fp->active[i]][j] - ds->data[n][j];
         y -= x*x;
       }
       y *= (parameters.Gamma);
-      line[i] = exp(y)*ds->y[ds->global[i]]*ds->y[ds->global[n]];
+      line[i] = exp(y);
+    	if( (i<ds->procPos) ^ (n < ds->procPos) ){
+        	line[i] = -line[i];
+	}
+}
+  }
+}
+/*
+void newAppendUpdate(struct denseData *ds, struct receiveData *rd, struct Fullproblem *oldfp, struct Fullproblem *newfp, double *line, int n)
+{
+	int j;
+  if (parameters.kernel == LINEAR) {
+		printf("adding to line %d\n",n);
+		if( n < rd->my_p){
+			#pragma omp parallel for private(j)
+  	  for (int i = 0; i < newfp->n; i++) {
+				if(i<rd->my_p){      	
+					line[i] = 0.0;
+  	    	for ( j = 0; j < ds->nFeatures; j++) {
+  	    	  line[i] += ds->data[rd->myIndex[i]][j]*ds->data[rd->myIndex[n]][j];
+  	    	}
+  				if( (rd->myIndex[i]<ds->procPos) ^ (rd->myIndex[n] < ds->procPos) ){
+  	      	line[i] = -line[i];
+					}
+				}
+				else{
+					line[i] = 0.0;
+  	    	for ( j = 0; j < ds->nFeatures; j++) {
+  	    	  line[i] += ds->data[i - rd->my_p][j]*ds->data[rd->myIndex[n]][j];
+  	    	}
+  				if( (rd->yr[i-rd->my_p] == 1) ^ (rd->myIndex[n] < ds->procPos) ){
+  	      	line[i] = -line[i];
+					}
+				}
+			}
+		}
+		else{
+			#pragma omp parallel for private(j)
+  	  for (int i = 0; i < newfp->n; i++) {
+				if(i<rd->my_p){      	
+					line[i] = 0.0;
+  	    	for ( j = 0; j < ds->nFeatures; j++) {
+  	    	  line[i] += ds->data[rd->myIndex[i]][j]*ds->data[rd->myIndex[n]][j];
+  	    	}
+  				if( (rd->myIndex[i]<ds->procPos) ^ (rd->myIndex[n] < ds->procPos) ){
+  	      	line[i] = -line[i];
+					}
+				}
+				else{
+					line[i] = 0.0;
+  	    	for ( j = 0; j < ds->nFeatures; j++) {
+  	    	  line[i] += ds->data[i - rd->my_p][j]*ds->data[rd->myIndex[n]][j];
+  	    	}
+  				if( (rd->yr[i-rd->my_p] == 1) ^ (rd->myIndex[n] < ds->procPos) ){
+  	      	line[i] = -line[i];
+					}
+				}
+			}
+
+		}
+}
+}*/
+
+void appendUpdate(struct denseData *ds, double *line, int n)
+{
+	int j;
+  if (parameters.kernel == LINEAR) {
+		printf("adding to line %d\n",n);
+		#pragma omp parallel for private(j)
+    for (int i = 0; i < ds->procInstances; i++) {
+      line[i] = 0.0;
+      for ( j = 0; j < ds->nFeatures; j++) {
+        line[i] += ds->data[i][j]*ds->data[n][j];
+      }
+  	if( (i<ds->procPos) ^ (n < ds->procPos) ){
+        	line[i] = -line[i];
+	}
     }
+  }
+  if (parameters.kernel == POLYNOMIAL) {
+		#pragma omp parallel for private(j)
+    for (int i = 0; i < ds->procInstances; i++) {
+      line[i] = 0.0;
+      for ( j = 0; j < ds->nFeatures; j++) {
+        line[i] += ds->data[i][j]*ds->data[n][j];
+      }
+      line[i] = pow(line[i]+parameters.Gamma, parameters.degree);
+     	if( ( i<ds->procPos ) ^ (n < ds->procPos) ){
+        	line[i] = -line[i];
+	}
+    }
+  }
+  else if (parameters.kernel == EXPONENTIAL) {
+    double x,y;
+		#pragma omp parallel for private(j)
+    for (int i = 0; i < ds->procInstances; i++) {
+      y = 0.0;
+      for ( j = 0; j < ds->nFeatures; j++) {
+        x = ds->data[i][j] - ds->data[n][j];
+        y -= x*x;
+      }
+      y *= (parameters.Gamma);
+      line[i] = exp(y);
+     	if( ( i<ds->procPos ) ^ ( n < ds->procPos) ){
+        	line[i] = -line[i];
+	}
+}
   }
 }
 
 
 void partialHupdate(struct Fullproblem *fp, struct Projected *sp, struct denseData *ds, struct svm_args *params, int n, int worst)
 {
+	int k;
   double *nline = findListLineSetLabel(fp->partialH, fp->active[n],fp->inactive[worst]);
   if (params->kernel == LINEAR) {
+		#pragma omp parallel for private(k)
     for (int j = 0; j < fp->n; j++) {
       nline[j] = 0.0;
-      for (int k = 0; k < ds->nFeatures; k++) {
-        nline[j]+=ds->data[ds->global[fp->inactive[worst]]][k]*ds->data[ds->global[j]][k];
+      for ( k = 0; k < ds->nFeatures; k++) {
+        nline[j]+=ds->data[fp->inactive[worst]][k]*ds->data[j][k];
       }
-      nline[j]*=ds->y[ds->global[fp->inactive[worst]]]*ds->y[ds->global[j]];
+     	if( ( j<ds->procPos ) ^ ( fp->inactive[worst] < ds->procPos) ){
+        	nline[j] = -nline[j];
+	}
     }
   }
   else if (params->kernel == POLYNOMIAL) {
+		#pragma omp parallel for private(k)
     for (int j = 0; j < fp->n; j++) {
       nline[j] = 0.0;
-      for (int k = 0; k < ds->nFeatures; k++) {
-        nline[j]+=ds->data[ds->global[fp->inactive[worst]]][k]*ds->data[ds->global[j]][k];
+      for ( k = 0; k < ds->nFeatures; k++) {
+        nline[j]+=ds->data[fp->inactive[worst]][k]*ds->data[j][k];
       }
       nline[j] = pow(nline[j]+params->Gamma, params->degree);
-      nline[j] *= ds->y[ds->global[fp->inactive[worst]]]*ds->y[ds->global[j]];
+     	if( ( j<ds->procPos ) ^ ( fp->inactive[worst] < ds->procPos) ){
+        	nline[j] = -nline[j];
+	}
     }
   }
   else if (params->kernel == EXPONENTIAL) {
     double x,y;
+		#pragma omp parallel for private(k)
     for (int j = 0; j < fp->n; j++) {
       y = 0.0;
-      for (int k = 0; k < ds->nFeatures; k++) {
-        x = ds->data[ds->global[fp->inactive[worst]]][k] - ds->data[ds->global[j]][k];
+      for ( k = 0; k < ds->nFeatures; k++) {
+        x = ds->data[fp->inactive[worst]][k] - ds->data[j][k];
         y -= x*x;
       }
       y *= (params->Gamma);
-      nline[j] = exp(y)*ds->y[ds->global[fp->inactive[worst]]]*ds->y[ds->global[j]];
+      nline[j] = exp(y);
+     	if( ( j<ds->procPos ) ^ ( fp->inactive[worst] < ds->procPos) ){
+        	nline[j] = -nline[j];
+	}
     }
   }
 

@@ -20,7 +20,7 @@ void linearOp(double* vecOut, double* vecIn, double a, int p);
 void updateGamma(struct Projected *sp, double lambda);
 void calcYTR(struct Projected *sp, struct Fullproblem *fp);
 void copy_vector(double* a, double* b, int p);
-void constraint_projection(double* vecOut, double* vecIn, double* y, int p);
+void constraint_projection(double* vecOut, double* vecIn, int* y, int p);
 double inner_prod(double *a, double *b, int p);
 void   freeSubProblem( struct Projected* sp);
 

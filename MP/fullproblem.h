@@ -25,5 +25,6 @@ void findWorst(int *worst, int* target, int* change, int *n, struct denseData *d
 void spreadChange(struct denseData *ds, struct Fullproblem *fp, struct Projected *sp, int target, double diff, int change, int n);
 void reinitprob(struct denseData *ds, struct Fullproblem *fp, struct Projected *sp, int add, int* temp, int* temp2);
 void  freeFullproblem(struct Fullproblem *fp);
-
+void nds_alloc_prob(struct Fullproblem *prob, int p);
+void nds_init_prob(struct Fullproblem *newfp, struct Fullproblem *oldfp, struct receiveData *rd, struct denseData *ds);
 #endif

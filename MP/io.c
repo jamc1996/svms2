@@ -24,7 +24,6 @@ void divideSet(struct denseData *ds, int nprocs, int myid)
 	}
 
 	ds->procNeg = ds->procInstances - ds->procPos;
-	ds->global = malloc(sizeof(int)*ds->procInstances);
 	ds->negStart = 0;
 
 	for(int i = 0; i< myid; i++)
@@ -39,14 +38,6 @@ void divideSet(struct denseData *ds, int nprocs, int myid)
 			ds->negStart --;
 		}
 	}
-	for(int i = 0; i<ds->procPos; i++)
-	{
-		ds->global[i] = ds->posStart + i;
-	}
-	for(int i = 0; i<ds->procNeg; i++)
-	{
-		ds->global[ds->procPos + i] = ds->nPos + ds->negStart + i;
-	}
 }
 
 
@@ -57,69 +48,77 @@ void read_file(char* filename, struct denseData* ds, int nprocs, int myid){
     exit(1);
   }
   count_entries(fp, ds);
+  divideSet(ds, nprocs, myid);
 
-	divideSet(ds, nprocs, myid);
-
-
-  ds->data1d = (double*)malloc(sizeof(double)*ds->nInstances*ds->nFeatures);
-  ds->data = (double**)malloc(sizeof(double*)*ds->nInstances);
-  ds->instanceLabels = (char**)malloc(sizeof(char*)*ds->nInstances);
-  ds->featureLabels = (char**)malloc(sizeof(char*)*ds->nFeatures);
-  ds->y = (double*)malloc(sizeof(double)*ds->nInstances);
-  double* temp= (double*)malloc(sizeof(double)*ds->nFeatures);
+  ds->data1d = malloc(sizeof(double)*ds->procInstances*ds->nFeatures);
+  ds->data = malloc(sizeof(double*)*ds->procInstances);
+  double* temp;
 
   char* line = NULL;
   char* endptr;
-  if (0) {
-    for (int i = 0; i < ds->nFeatures; i++) {
-      ds->featureLabels[i] = strtok(NULL, " \t");
-    }
-  }
-  for (int i = 0; i < ds->nInstances; i++) {
+
+  for (int i = 0; i < ds->procInstances; i++) {
     ds->data[i] = &ds->data1d[i*ds->nFeatures];
   }
   int r = 0;
+  int procR = 0;
   int q = 0;
+	int procQ = 0;
+  int flag = 0;
   for (int i = 0; i < ds->nInstances; i++) {
     readline(fp,&line);
-    ds->instanceLabels[i] = strtok(line, " \t");
-    if (ds->instanceLabels[i] == NULL || *(ds->instanceLabels[i]) == '\n') {
-      fprintf(stderr, "main.cpp: read_file(): bad read at %d\n",i );
-      exit(1);
+    char *p = strtok(line, " \t");
+    int num = atoi(p);
+//    if (ds->instanceLabels[i] == NULL || *(ds->instanceLabels[i]) == '\n') {
+//      fprintf(stderr, "main.cpp: read_file(): bad read at %d\n",i );
+//      exit(1);
+//    }
+    if(num == 1){
+	if(r<ds->posStart){
+		r++;
+		continue;
+	}
+	else if(procR == ds->procPos){
+		continue;	
+	}
+	else {
+		temp = ds->data[procR];
+		for (int j = 0; j < ds->nFeatures; j++) {
+      			char* p = strtok(NULL, " \t");
+				if (p == NULL || *p == '\n') {
+					fprintf(stderr, "Oh dear\n" );
+					exit(1);
+				}
+				temp[j] = strtod(p, &endptr);
+		}
+		r++;
+		procR++;
+	}
     }
-
-    for (int j = 0; j < ds->nFeatures; j++) {
-      char* p = strtok(NULL, " \t");
-      if (p == NULL || *p == '\n') {
-        fprintf(stderr, "Oh dear\n" );
-        exit(1);
-      }
-      temp[j] = strtod(p, &endptr);
-//      ds->data[i][j] = strtod(p, &endptr);
-    }
-    char* p = strtok(NULL, " \t");
-    if (atoi(p) == 1) {
-      for (int j = 0; j < ds->nFeatures; j++) {
-        ds->data[r][j] = temp[j];
-      }
-      ds->y[r] = 1;
-
-      r++;
-    }
-    else if (atoi(p) == -1){
-      for (int j = 0; j < ds->nFeatures; j++) {
-        ds->data[ds->nPos+q][j] = temp[j];
-      }
-      ds->y[ds->nPos+q] = -1;
-
-      q++;
-
-    }
+    else if (num == -1){
+      	if(q<ds->negStart){
+		q++;
+		continue;
+	}
+	else if(procQ == ds->procNeg){
+		continue;	
+	}
+	else {
+		temp = ds->data[procQ + ds->procPos];
+		for (int j = 0; j < ds->nFeatures; j++) {
+      			char* p = strtok(NULL, " \t");
+				if (p == NULL || *p == '\n') {
+					fprintf(stderr, "Oh dear\n" );
+					exit(1);
+				}
+				temp[j] = strtod(p, &endptr);
+		}
+		procQ++;
+		q++;
+	}
   }
-
-  free(temp);
 }
-
+}
 void count_entries(FILE *input, struct denseData* ds)
 {
   ds->nInstances = 0;
@@ -132,7 +131,8 @@ void count_entries(FILE *input, struct denseData* ds)
   // Find size of dataset:
   while (readline(input, &line)) {
     if (ds->nFeatures==-1) {
-      char *p = strtok(line," \t");
+	char* p = strtok(line, "\t");
+	ds->nFeatures++;
       while (1) {
         p  = strtok(NULL, " \t");
         if (p == NULL || *p == '\n') {
@@ -144,9 +144,6 @@ void count_entries(FILE *input, struct denseData* ds)
       continue;
     }
     char* p = strtok(line," \t");
-    for (int i = 0; i < ds->nFeatures+1; i++) {
-      p = strtok(NULL, " \t");
-    }
     counter++;
     int num = atoi(p);
     if (num == 1) {
@@ -199,7 +196,10 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
         for (int k = 0; k < ds->nFeatures; k++) {
           H[i][j] += ds->data[i][k]*ds->data[active[j]][k];
         }
-        H[i][j] *= ds->y[active[j]]*ds->y[i];
+       	if( (active[j] < ds->procPos) ^ (i < ds->procPos)){
+	
+        	H[i][j] = -H[i][j];
+      }
       }
     }
     for (int i = 0; i < count; i++) {
@@ -215,14 +215,21 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
     for (int i = 0; i < count; i++) {
       b -= H[r][i]*fp->alpha[active[i]];
     }
-    b *= ds->y[r];
+    if(r >= ds->procPos){
+    b = -b;
+	}
 
     double *w = malloc(sizeof(double)*ds->nFeatures);
 
     for (int i = 0; i < ds->nFeatures; i++) {
       w[i] = 0.0;
       for (int j = 0; j < count; j++) {
-        w[i] += fp->alpha[active[j]]*ds->data[active[j]][i]*ds->y[active[j]];
+	if(active[j] < ds->procPos){
+        	w[i] += fp->alpha[active[j]]*ds->data[active[j]][i];
+
+	}else{
+	w[i] -= fp->alpha[active[j]]*ds->data[active[j]][i];
+	}
       }
     }
 
@@ -244,8 +251,11 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
           H[i][j] += ds->data[i][k]*ds->data[active[j]][k];
         }
         H[i][j] = pow(H[i][j]+params->Gamma, params->degree);
-        H[i][j] *= ds->y[active[j]]*ds->y[i];
+	if( (active[j] < ds->procPos) ^ (i < ds->procPos)){
+	
+        	H[i][j] = -H[i][j];
       }
+	}
     }
     for (int i = 0; i < count; i++) {
       if (fp->alpha[active[i]] < fp->C*0.99) {
@@ -262,7 +272,9 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
     for (int i = 0; i < count; i++) {
       b -= H[r][i]*fp->alpha[active[i]];
     }
-    b *= ds->y[r];
+    if(r >= ds->procPos){
+    b = -b;
+	}
     fprintf(file, "%lf\n",b );
 
     for (int i = 0; i < count; i++) {
@@ -272,7 +284,7 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
     }
 
     for (int i = 0; i < count; i++) {
-      fprintf(file, "%lf\n",fp->alpha[active[i]]*ds->y[active[i]] );
+      //fprintf(file, "%lf\n",fp->alpha[active[i]]*ds->y[active[i]] );
     }
   }
   else if(params->kernel == EXPONENTIAL)
@@ -287,7 +299,11 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
           y -= x*x;
         }
         y *= params->Gamma;
-        H[i][j] = exp(y)*ds->y[active[j]]*ds->y[i];
+        H[i][j] = exp(y);
+	if( (active[j] < ds->procPos) ^ (i < ds->procPos)){
+	
+        	H[i][j] = -H[i][j];
+      }
       }
     }
     for (int i = 0; i < count; i++) {
@@ -305,7 +321,9 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
     for (int i = 0; i < count; i++) {
       b -= H[r][i]*fp->alpha[active[i]];
     }
-    b *= ds->y[r];
+    if(r >= ds->procPos){
+    b = -b;
+	}
     fprintf(file, "%lf\n",b );
 
     for (int i = 0; i < count; i++) {
@@ -315,7 +333,7 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
     }
 
     for (int i = 0; i < count; i++) {
-      fprintf(file, "%lf\n",fp->alpha[active[i]]*ds->y[active[i]] );
+      //fprintf(file, "%lf\n",fp->alpha[active[i]]*ds->y[active[i]] );
     }
   }
 
@@ -323,11 +341,12 @@ void saveTrainedModel(struct Fullproblem *fp, struct denseData *ds, char *filena
   free(h);
   free(H);
   fclose(file);
+
 }
 
 void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params)
 {
-  FILE *fp = fopen(fn, "r");
+/*  FILE *fp = fopen(fn, "r");
   int k;
   double b;
   int kernel;
@@ -450,7 +469,7 @@ void testSavedModel(struct denseData *ds, char* fn, struct svm_args *params)
   printf("%d correct classifications out of %d. %.2lf%% correct.\n",right,ds->nInstances,pct );
 
   fclose(fp);
-
+*/
 }
 
 int readline(FILE *input, char **line)
@@ -607,9 +626,7 @@ void cleanData( struct denseData *ds){
 void freeDenseData(struct denseData *ds)
 /* Function to free dynamically allocated memory in dense data set struct. */
 {
+	printf("free Dense data\n");
   free(ds->data);
   free(ds->data1d);
-  free(ds->y);
-  free(ds->instanceLabels);
-  free(ds->featureLabels);
 }
