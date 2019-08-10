@@ -10,8 +10,14 @@
 #include "svm.h"
 #include "kernels.h"
 
+/*      fullproblem.h -- header file for fullproblem.c
+ *
+ *      Author:     John Cormican
+ *
+ */
+
 void changeP( struct Fullproblem *fp, struct Projected *sp, int add);
-int findWorstest(struct Fullproblem *fp , int add, int* temp, int* temp2);
+int findWorstAdd(struct Fullproblem *fp , int add, int* temp, int* temp2);
 void shrinkSize( struct Fullproblem *fp, struct Projected *sp, int k);
 void alloc_prob(struct Fullproblem *prob, struct denseData *ds, int p);
 void init_prob(struct Fullproblem *prob, struct denseData *ds);

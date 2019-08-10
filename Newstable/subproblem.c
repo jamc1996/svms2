@@ -1,5 +1,16 @@
 #include "subproblem.h"
 
+/*      subproblem.c -- program with functions for solving the projected
+ *                        sub problem using the conjugate gradient method.
+ *
+ *      Author:     John Cormican
+ *
+ *      Purpouse:   To manage the conjugate gradient algorithm on the subproblem.
+ *
+ *      Usage:      Various functions called from algorithm.c.
+ *
+ */
+
 
 void alloc_subprob(struct Projected *sp, int p)
 /*  Function to allocate space to solve the projected problem of size p.
@@ -30,7 +41,6 @@ void init_subprob(struct Projected *sp, struct Fullproblem *fp, struct denseData
  * in a dataset and fp struct with active/inactive vectors initialized.
 
  *  Required: Everything allocated, active and inactive correct.
- *
 
  */
 {
@@ -62,16 +72,9 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
   int its = 0;;
   while (rSq > 0.000000001) {
     its++;
-    if(its % 1000 == 0){
-      printf("rSq is %lf\n",rSq );
-    }
     calc_Hrho(sp);
 
     if (fabs(inner_prod(sp->Hrho, sp->rho, sp->p)) < 0.00000000000000000000000000001) {
-      printf("%lf\n",inner_prod(sp->Hrho, sp->rho, sp->p) );
-      for (int j = 0; j < fp->p; j++) {
-        printf("act = %d\n",fp->active[j] );
-      }
       exit(250);
     }
     lambda = rSq/inner_prod(sp->Hrho, sp->rho, sp->p);
@@ -81,12 +84,10 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
 
     if(problem){
       if (problem >= sp->p*2) {
-        printf("Oh no! (%d) %d\n",sp->p,fp->active[problem - (sp->p*2)] );
         linearOp(sp->alphaHat, sp->rho, -lambda, sp->p);
         return problem;
       }
       else if( problem < -sp->p){
-        printf("Oh no! (%d) %d\n",sp->p,fp->active[problem + (sp->p*2)] );
         linearOp(sp->alphaHat, sp->rho, -lambda, sp->p);
         return problem;
       }
@@ -109,7 +110,7 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
 }
 
 void calcYTR(struct Projected *sp, struct Fullproblem *fp)
-/* Function to calculate the innter product of the projected*/
+/* Function to calculate the average inner product yHat and rHat*/
 {
   sp->ytr = 0.0;
   for (int i = 0; i < sp->p; i++) {
@@ -119,6 +120,7 @@ void calcYTR(struct Projected *sp, struct Fullproblem *fp)
 }
 
 void linearOp2(double* vecOut, double* vecIn, double a, int p)
+/* Function to perform vecOut = vecIn + a*vecOut */
 {
   for (int i = 0; i < p; i++) {
     vecOut[i] *= a;
@@ -141,7 +143,7 @@ void updateGamma(struct Projected *sp, double lambda)
 
 
 void linearOp(double* vecOut, double* vecIn, double a, int p)
-/* Function to add constant times */
+/* Function to perform vecOut = vecOut + a*vecIn */
 {
   for (int i = 0; i < p; i++) {
     vecOut[i] += a*vecIn[i];
@@ -219,6 +221,7 @@ void init_error(struct Projected* sp)
 }
 
 void copy_vector(double* a, double* b, int p)
+/* Function to copy vector b in to vector a (both length p)*/
 {
   for (int i = 0; i < p; i++) {
     a[i] = b[i];
@@ -226,6 +229,7 @@ void copy_vector(double* a, double* b, int p)
 }
 
 void constraint_projection(double* vecOut, double* vecIn, double* y, int p)
+/* Function to perform the necessary constraint projection. */
 {
   for (int i = 0; i < p; i++) {
     vecOut[i] = vecIn[i];
@@ -236,6 +240,7 @@ void constraint_projection(double* vecOut, double* vecIn, double* y, int p)
 }
 
 double inner_prod(double *a, double *b, int p)
+/* Function to find the inner product of two length p vectors. */
 {
   double val = 0.0;
   for (int i = 0; i < p; i++) {

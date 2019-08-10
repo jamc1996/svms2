@@ -8,6 +8,12 @@
 #include "svm.h"
 #include "kernels.h"
 
+/*      fullproblem.h -- header file for fullproblem.c
+ *
+ *      Author:     John Cormican
+ *
+ */
+
 
 double* findListLine(List l, int n);
 List Init_Empty_List();

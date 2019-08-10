@@ -1,24 +1,20 @@
 #include "kernels.h"
 
-
-
-
-int updateSubH(struct Fullproblem *fp, struct Projected *sp, struct denseData *ds, struct svm_args *params)
-{
-  Cell* temp = fp->partialH.head;
-  int i = 0;
-  while ( temp != NULL ) {
-    for (int j = i; j < fp->p ; j++) {
-      sp->H[i][j] = temp->line[fp->active[j]];
-    }
-    i++;
-    temp = temp->next;
-  }
-
-  return 0;
-}
+/*      kernels.c -- program with functions for calculating PH and hatH
+ *                matrices for linear, polynomial, and exponential kernels.
+ *
+ *      Author:     John Cormican
+ *
+ *      Purpouse:   To perform the heavy calculation of the PH matrix.
+ *
+ *      Usage:      Functions called to update entries in fp.partialH, sp.H
+ *
+ */
 
 void appendUpdate(struct denseData *ds, double *line, int n)
+/*  Function to calculate a column of the matrix PH and store it as an array
+ *  in a list.
+ */
 {
   if (parameters.kernel == LINEAR) {
     for (int i = 0; i < ds->nInstances; i++) {
@@ -52,7 +48,7 @@ void appendUpdate(struct denseData *ds, double *line, int n)
         y -= x*x;
       }
       y *= (parameters.Gamma);
-			line[i] = exp(y);      
+			line[i] = exp(y);
 			if(  (i < ds->nPos  )   ^   (n < ds->nPos)  ){
        	line[i] = -line[i];
       }
@@ -62,6 +58,9 @@ void appendUpdate(struct denseData *ds, double *line, int n)
 
 
 void partialHupdate(struct Fullproblem *fp, struct Projected *sp, struct denseData *ds, struct svm_args *params, int n, int worst)
+/*  Function to replace a line in the list of PH columns with a new line from
+ *  column inactive[worst]
+ */
 {
   double *nline = findListLineSetLabel(fp->partialH, fp->active[n],fp->inactive[worst]);
   if (params->kernel == LINEAR) {
@@ -111,4 +110,21 @@ void partialHupdate(struct Fullproblem *fp, struct Projected *sp, struct denseDa
   for (int i = n+1; i < sp->p; i++) {
     sp->H[n][i] = nline[fp->active[i]];
   }
+}
+
+int updateSubH(struct Fullproblem *fp, struct Projected *sp, struct denseData *ds, struct svm_args *params)
+/*   Function to caculate sp->H for solution using the conjugate gradient algorithm.
+ */
+{
+  Cell* temp = fp->partialH.head;
+  int i = 0;
+  while ( temp != NULL ) {
+    for (int j = i; j < fp->p ; j++) {
+      sp->H[i][j] = temp->line[fp->active[j]];
+    }
+    i++;
+    temp = temp->next;
+  }
+
+  return 0;
 }
