@@ -49,11 +49,11 @@ void tradeInfo(struct receiveData *rd, struct denseData *ds, struct yDenseData *
 		nds->data1d = malloc(sizeof(double)*5*nds->nFeatures*nds->nInstances);
 		nds->data = malloc(sizeof(double*)*5*nds->nInstances);
 		nds->y = malloc(sizeof(int)*5*nds->nInstances);
-		for(int i=0; i< nds->nInstances; i++){
+		for(int i=0; i< 5*nds->nInstances; i++){
 			nds->data[i] = &nds->data1d[i*ds->nFeatures];
 		}
-		nfp->alpha = malloc(sizeof(double)*nds->nInstances);
-		nfp->gradF = malloc(sizeof(double)*nds->nInstances);
+		nfp->alpha = malloc(sizeof(double)*5*nds->nInstances);
+		nfp->gradF = malloc(sizeof(double)*5*nds->nInstances);
 		nfp->n = nds->nInstances;
 		nfp->p = tP;
 		nfp->q = tMissed;
@@ -116,9 +116,11 @@ int pos = 0;
 
 			if(nfp->gradF[i] > 0){
 				nds->y[i] = 1;
+				nfp->alpha[i] = nfp->gradF[i];
 				pos++;			
 			}else{
 				nds->y[i] = -1;
+				nfp->alpha[i] = -nfp->gradF[i];
 			}
 			rd->nPos = pos;
 		}
@@ -128,20 +130,17 @@ int pos = 0;
 		for(int id = 0; id< commSz; id++){
 			for(int j=0; j<otherP[id]; j++){
 				if(id == 0){
-					nfp->alpha[tot] = nfp->gradF[tot];
 					for(int k =0; k< ds->nFeatures; k++){
 						nds->data[tot][k] = ds->data[fp->active[j]][k];
 					}
 					tot++;
 				}else{
-					nfp->alpha[tot] = nfp->gradF[tot];
 					MPI_Recv((nds->data[tot]), ds->nFeatures, MPI_DOUBLE, id, j, mini_comm, MPI_STATUS_IGNORE);
 					tot++;
 				}
 			}
 		}
 	}else{
-		printf("myid %d got here\n",commID);
 		for(int j=0; j<fp->p; j++){
 			MPI_Send(ds->data[fp->active[j]], ds->nFeatures, MPI_DOUBLE, 0, j, mini_comm );
 		}
@@ -150,7 +149,6 @@ int pos = 0;
 		}
 	}
 		MPI_Bcast(&(rd->nPos), 1, MPI_INT, 0,  mini_comm);
-		printf("rd = %d\n",rd->nPos);
 
 	if(commID == 0){
 		int act=0, inact = 0;
@@ -179,14 +177,10 @@ int pos = 0;
 		}
 		Cell* temp = nfp->partialH.head;
 		while(temp != NULL){
-			printf("label = %d\n",temp->label);
 			for(int i=0; i<nfp->n; i++){
 				nfp->gradF[i] -= temp->line[i]*nfp->alpha[temp->label];
 			}
 			temp = temp->next;
-		}
-		for(int i=0; i<nfp->n; i++){
-			printf("gradF[%d] = %lf\n", i, nfp->gradF[i]);
 		}
 	}else{
 		rd->data1d = malloc(sizeof(double)*ds->nFeatures*rd->total*5);

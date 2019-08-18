@@ -58,7 +58,6 @@ int main(int argc, char *argv[]) {
   // We loop until no negative entries in beta:
 	run_serial_problem(&ds, &fp, &sp); 
 	MPI_Barrier(MPI_COMM_WORLD);
-	printf("Run\n");
 
 	if(nProcGroups < nprocs){
 		MPI_Comm_free(&mini_comm);
@@ -73,94 +72,161 @@ int main(int argc, char *argv[]) {
 	struct yDenseData nds;
 	struct Projected nsp;
 
-	printf("Trading\n");
 	tradeInfo(&rd, &ds, &nds, &fp, &nfp, mini_comm, groupSz, groupID, myid);
-	printf("Traded\n");
 
 	if(myid == 0){
 	  alloc_subprob(&nsp, nfp.p);
 	}
-	MPI_Win dataWin, alphaWin, ytrWin;
 
+	MPI_Win dataWin, alphaWin, ytrWin, gradWin, yWin;
 	MPI_Barrier(MPI_COMM_WORLD);
+
 	if(myid == 0){
-		MPI_Win_create(nds.data1d, nds.nInstances*nds.nFeatures*sizeof(double), sizeof(double), MPI_INFO_NULL, mini_comm, &dataWin);
-		MPI_Win_create(nfp.alpha, nfp.n*sizeof(double), sizeof(double), MPI_INFO_NULL, mini_comm, &alphaWin);
+		MPI_Win_create(nds.data1d, 5*nds.nInstances*nds.nFeatures*sizeof(double), sizeof(double), MPI_INFO_NULL, mini_comm, &dataWin);
+		MPI_Win_create(nfp.alpha, 5*nfp.n*sizeof(double), sizeof(double), MPI_INFO_NULL, mini_comm, &alphaWin);
+		MPI_Win_create(nfp.gradF, 5*nfp.n*sizeof(double), sizeof(double), MPI_INFO_NULL, mini_comm, &gradWin);
+		MPI_Win_create(nds.y, 5*nds.nInstances*sizeof(int), sizeof(int), MPI_INFO_NULL, mini_comm, &yWin);
 		MPI_Win_create(&(nsp.ytr), sizeof(double), sizeof(double), MPI_INFO_NULL, mini_comm, &ytrWin);
 	}else{
 		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &dataWin);
 		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &alphaWin);
+		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &gradWin);
+		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &yWin);
 		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &ytrWin);
 	}
-
-
+	
 
 	MPI_Win_fence(MPI_MODE_NOPRECEDE, dataWin);
 
 	if(groupID != 0){
-		MPI_Get(rd.data1d, rd.total*ds.nFeatures, MPI_DOUBLE, 0, 0 , 66, MPI_DOUBLE, dataWin);
+		MPI_Get(rd.data1d, rd.total*ds.nFeatures, MPI_DOUBLE, 0, 0 , rd.total*ds.nFeatures, MPI_DOUBLE, dataWin);
 	}
-
 	MPI_Win_fence(0, dataWin);
-
-
-
+	
+	
 	if(groupID == 0){
+		for (int i =0; i<nds.nInstances; i++){
+			printf("i = %d y[i] = %d gradf =  %lf,\n\n alpha = %lf\n\n",i, nds.y[i], nfp.gradF[i], nfp.alpha[i]);
+			for(int j=0; j<nds.nFeatures; j++){
+				printf("%lf\t",nds.data[i][j] );
+			}
+			printf("\n");
+		}
 		run_Yserial_problem(&nds, &nfp, &nsp);
 	}
-
+	
 	MPI_Barrier(mini_comm);
 	MPI_Win_fence(0, dataWin);
 	MPI_Win_fence(MPI_MODE_NOPRECEDE, alphaWin);
 	MPI_Win_fence(MPI_MODE_NOPRECEDE, ytrWin);
-
+	
 	if(groupID !=0 ){
 		MPI_Get(rd.alpha, rd.total, MPI_DOUBLE, 0, 0 ,rd.total, MPI_DOUBLE, alphaWin);
 		MPI_Get(&(rd.ytr), 1, MPI_DOUBLE, 0, 0 ,1, MPI_DOUBLE, ytrWin);
 	}
-
 	MPI_Win_fence(0, alphaWin);
 	MPI_Win_fence(0, ytrWin);
-
+	
 	if(myid == 1){
 		calcW(&rd);
 	}else{
 		rootCalcW(&rd, &nds, &nfp);
 		rd.ytr = nsp.ytr;
 	}
-
 	ReceiveCalcBeta(&fp, &rd, &ds);
-	int* temp = malloc(sizeof(int)*5);
-	find_n_worst(temp, 5, &fp);
-	for(int i=0; i<5; i++){
-		printf("%d\n",temp[i]);
+	int sending = 5;
+	int* temp = malloc(sizeof(int)*sending);
+	find_n_worst(temp, sending, &fp);
+	MPI_Win_fence(MPI_MODE_NOPRECEDE, yWin);
+	MPI_Win_fence(MPI_MODE_NOPRECEDE, gradWin);
+	
+	for (int i=0; i < sending; i++){
+		MPI_Put(ds.data[temp[i]], ds.nFeatures, MPI_DOUBLE, 0, ds.nFeatures*(rd.total+(myid*sending)+i), ds.nFeatures, MPI_DOUBLE, dataWin);
+		MPI_Put(&fp.gradF[temp[i]], 1, MPI_DOUBLE, 0, rd.total+(myid*sending)+i, 1, MPI_DOUBLE, gradWin);
+		int y_send = -1;
+		if(temp[i] < ds.procPos){
+			y_send = 1;
+		}
+		MPI_Put(&y_send, 1, MPI_INT, 0, rd.total+(myid*sending)+i, 1, MPI_INT, yWin);
+	}
+	
+	if(myid == 0){
+		nfp.inactive = realloc(nfp.inactive, sizeof(int)*(nfp.q+(nprocs*sending))  );
+		nfp.beta = realloc(nfp.beta,sizeof(double)*(nfp.q+(nprocs*sending)));
+		for( int i=0; i<nprocs*sending; i++){
+			nfp.alpha[i+nds.nInstances] = 0.0;
+			nfp.inactive[i+nfp.q] = i + nds.nInstances;
+		}
+		nfp.n += (nprocs*sending);
+		nfp.q += (nprocs*sending);
+		printf("%d\n",nfp.p);
+		Cell *temp = nfp.partialH.head;
+		while(temp!= NULL){
+			printf("lable is %d\n",temp->label);
+			temp = temp->next;
+		}
+
+		printf("That's all\n");
+		temp = nfp.partialH.head;
+		while(temp != NULL){
+			printf("reallocing with label is %d\n",temp->label);
+			temp->line = realloc(temp->line, sizeof(double)*(nfp.n));
+			temp = temp->next;
+		}
+		printf("should be ok now\n");
+	}
+	
+	MPI_Win_fence(0, yWin);
+	MPI_Win_fence(0, gradWin);
+	MPI_Win_fence(0, dataWin);
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	rd.total += nprocs*sending;
+	if(myid == 0){
+		Cell* temp = nfp.partialH.head;
+		while (temp!=NULL){
+			for (int i=nds.nInstances; i<nfp.n; i++){
+				temp->line[i] = 0.0;
+				for(int j = 0; j<nds.nFeatures; j++){
+					temp->line[i] += nds.data[temp->label][j]*nds.data[i][j];
+				}
+				temp->line[i] *= nds.y[temp->label]*nds.y[i];
+			}
+			temp = temp->next;
+		}
+
+		nds.nInstances += nprocs*sending;
+		for (int i =0; i<nds.nInstances; i++){
+			printf("i = %d y[i] = %d gradf =  %lf, \n\nalpha = %lf\n\n",i, nds.y[i], nfp.gradF[i], nfp.alpha[i]);
+			for(int j=0; j<nds.nFeatures; j++){
+				printf("%lf\t",nds.data[i][j] );
+			}
+			printf("\n");
+		}
+}
+
+
+	if(groupID == 0){
+		//run_Yserial_problem(&nds, &nfp, &nsp);
 	}
 
 
-  //gettimeofday(&end, 0);
 
-  //long totalelapsed = (end.tv_sec-start.tv_sec)*1000000 + end.tv_usec-start.tv_usec;
-  //long trainelapsed = (trainEnd.tv_sec-trainStart.tv_sec)*1000000 + trainEnd.tv_usec-trainStart.tv_usec;
 
-  printf("Training Complete\n" );
-  //printf("Total Time spent: %ld micro seconds\n",totalelapsed );
-  //printf("Time spent training: %ld micro seconds\n",trainelapsed );
-
-  //Memory freed
-	printf("free dens %d\n",myid);
   freeDenseData(&ds);
-	printf("free full %d\n", myid);
   freeFullproblem(&fp);
-	printf("free sub %d\n",myid);
   freeSubProblem(&sp);
 
 	MPI_Barrier(MPI_COMM_WORLD);
-	printf("myid is %d and I'm finalizing\n",myid);
 
 	MPI_Win_fence(MPI_MODE_NOSUCCEED, dataWin);
 	MPI_Win_fence(MPI_MODE_NOSUCCEED, alphaWin);
 	MPI_Win_fence(MPI_MODE_NOSUCCEED, ytrWin);
+	MPI_Win_fence(MPI_MODE_NOSUCCEED, gradWin);
+	MPI_Win_fence(MPI_MODE_NOSUCCEED, yWin);
 
+	MPI_Win_free(&yWin);
+	MPI_Win_free(&gradWin);
 	MPI_Win_free(&dataWin);
 	MPI_Win_free(&alphaWin);
 	MPI_Win_free(&ytrWin);

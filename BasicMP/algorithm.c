@@ -157,11 +157,21 @@ void calcW(struct receiveData *rd){
 
 void ReceiveCalcBeta(struct Fullproblem *fp, struct receiveData *rd, struct denseData *ds){
 	for(int i=0; i<fp->q; i++){
-		fp->beta[i] = rd->ytr;
 		for(int j=0; j<ds->nFeatures; j++){
 			fp->beta[i] += rd->w[j]*ds->data[fp->inactive[i]][j];
 		}
-		printf("beta[%d] = %lf\n",i,fp->beta[i]);
+		fp->gradF[i] = 1 - fp->beta[i];
+		if(fp->inactive[i] >= ds->procPos){
+			fp->gradF[i] = 1 - fp->beta[i];
+		}else{
+			fp->gradF[i] = 1 + fp->beta[i];
+		}
+		fp->beta[i] += rd->ytr;
+		if(fp->inactive[i] >= ds->procPos){
+			fp->beta[i] = 1.05 - fp->beta[i];
+		}else{
+			fp->beta[i] = 1.05 + fp->beta[i];
+		}
 	}
 }
 
