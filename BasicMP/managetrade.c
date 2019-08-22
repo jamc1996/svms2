@@ -46,14 +46,14 @@ void tradeInfo(struct receiveData *rd, struct denseData *ds, struct yDenseData *
 		nds->nFeatures = ds->nFeatures;
 		nds->nInstances = tMissed + tP;
 
-		nds->data1d = malloc(sizeof(double)*5*nds->nFeatures*nds->nInstances);
-		nds->data = malloc(sizeof(double*)*5*nds->nInstances);
-		nds->y = malloc(sizeof(int)*5*nds->nInstances);
-		for(int i=0; i< 5*nds->nInstances; i++){
+		nds->data1d = malloc(sizeof(double)*15*nds->nFeatures*nds->nInstances);
+		nds->data = malloc(sizeof(double*)*15*nds->nInstances);
+		nds->y = malloc(sizeof(int)*15*nds->nInstances);
+		for(int i=0; i< 15*nds->nInstances; i++){
 			nds->data[i] = &nds->data1d[i*ds->nFeatures];
 		}
-		nfp->alpha = malloc(sizeof(double)*5*nds->nInstances);
-		nfp->gradF = malloc(sizeof(double)*5*nds->nInstances);
+		nfp->alpha = malloc(sizeof(double)*15*nds->nInstances);
+		nfp->gradF = malloc(sizeof(double)*15*nds->nInstances);
 		nfp->n = nds->nInstances;
 		nfp->p = tP;
 		nfp->q = tMissed;
@@ -63,6 +63,7 @@ void tradeInfo(struct receiveData *rd, struct denseData *ds, struct yDenseData *
 		nfp->beta = malloc(sizeof(double)*nfp->q);
 	}
 	else{
+		rd->y = malloc(sizeof(int)*15*(fp->p+my_missed));
 		alp = malloc(sizeof(double)*(fp->p+my_missed));
 		for(int i=0; i<fp->p; i++){
 			if(fp->active[i] < ds->procPos){
@@ -183,13 +184,13 @@ int pos = 0;
 			temp = temp->next;
 		}
 	}else{
-		rd->data1d = malloc(sizeof(double)*ds->nFeatures*rd->total*5);
-		rd->data = malloc(sizeof(double*)*rd->total*5);
+		rd->data1d = malloc(sizeof(double)*ds->nFeatures*rd->total*15);
+		rd->data = malloc(sizeof(double*)*rd->total*15);
 		for(int i=0; i<rd->total*5; i++){
 			rd->data[i] = &(rd->data1d[i*ds->nFeatures]);
 		}
 
-		rd->alpha = malloc(sizeof(double)*rd->total*5);
+		rd->alpha = malloc(sizeof(double)*rd->total*15);
 	}
 		rd->w = malloc(sizeof(double)*rd->nFeatures);
 

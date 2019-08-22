@@ -6,8 +6,31 @@ void run_Yserial_problem(struct yDenseData *ds, struct Fullproblem *fp, struct P
   int itt = 0;
   int n = 0;
 
+  double* fuH = malloc(sizeof(double)*ds->nInstances*ds->nInstances);
+  double ** HH = malloc(sizeof(double*)*ds->nInstances);
+  for(int i=0; i<ds->nInstances; i++){
+	HH[i] = &fuH[i*ds->nInstances];
+	for(int j =0;j<ds->nInstances; j++){
+			HH[i][j] = 0.0;
+			for(int k=0; k<ds->nFeatures; k++){
+				HH[i][j] += ds->data[i][k]*ds->data[j][k];
+			}
+			HH[i][j] *= ds->y[i]*ds->y[j];
+		}
+	}
+	double* check = malloc(sizeof(double)*ds->nInstances);
+			 
+
   while(k){
-			
+	for(int i=0; i<ds->nInstances; i++){
+		if(fp->alpha[i] < -fp->C){
+			printf("here %d\n",itt);
+			for(int i=0; i<fp->n; i++){
+				printf("%lf\n",fp->alpha[i]);
+			}
+			exit(1);
+		}
+	}
    	// H matrix columns re-set and subproblem changed
    	if(itt%10000 == 0){
    	  printf("itt = %d\n",itt );
@@ -19,10 +42,21 @@ void run_Yserial_problem(struct yDenseData *ds, struct Fullproblem *fp, struct P
    	//  if algorithm completes n == 0
    	//  if algorithm interrupt n != 0
    	n = cg(sp, fp);
-
    	updateAlphaR(fp, sp);
    	calcYTR(sp, fp);
    	YcalculateBeta(fp, sp, ds);
+	for (int i=0; i<ds->nInstances; i++){
+		check[i] = 1.0;
+		for(int j=0; j<ds->nInstances; j++){
+			check[i] -= HH[i][j]*fp->alpha[j];
+		}
+	}
+	for (int i=0; i<ds->nInstances; i++){
+		if(fabs(check[i] - fp->gradF[i]) > 0.00005 ){
+			printf("problem with %d %lf %lf\n",i, check[i], fp->gradF[i]);
+			exit(1);
+		}
+	}
 
    	if (n==0) {
      	printf("Converged! (itt = %d) %d %d\n", itt, fp->p, fp->n );
@@ -46,6 +80,7 @@ void run_Yserial_problem(struct yDenseData *ds, struct Fullproblem *fp, struct P
 	    // BCs broken, fix one at a time for the moment
 	    k = Ysingleswap(ds, fp, sp, n, &parameters);
 	    if (k < 0) {
+		printf("shrinking\n");
 	      shrinkSize(fp, sp, k+fp->p);
 	    }
 	    else{
@@ -131,6 +166,9 @@ void run_serial_problem(struct denseData *ds, struct Fullproblem *fp, struct Pro
 }
 
 void rootCalcW(struct receiveData *rd, struct yDenseData *nds, struct Fullproblem *nfp){
+	for(int j=0; j<nds->nFeatures; j++){
+		rd->w[j] = 0.0;
+	}
 	for(int i =0; i<nds->nInstances; i++){
 		if(nfp->alpha[i] > 0.0){
 			for(int j=0; j<nds->nFeatures; j++){
@@ -142,14 +180,13 @@ void rootCalcW(struct receiveData *rd, struct yDenseData *nds, struct Fullproble
 
 
 void calcW(struct receiveData *rd){
+	for(int j=0; j<rd->nFeatures; j++){
+		rd->w[j] = 0.0;
+	}
 	for(int i =0; i<rd->total; i++){
 		if(rd->alpha[i] > 0.0){
 			for(int j=0; j<rd->nFeatures; j++){
-				if(i < rd->nPos){
-					rd->w[j] += rd->alpha[i]*rd->data[i][j];
-				}else{
-					rd->w[j] -= rd->alpha[i]*rd->data[i][j];
-				}
+				rd->w[j] += rd->alpha[i]*rd->data[i][j]*rd->y[i];	
 			}
 		}
 	}
@@ -157,25 +194,24 @@ void calcW(struct receiveData *rd){
 
 void ReceiveCalcBeta(struct Fullproblem *fp, struct receiveData *rd, struct denseData *ds){
 	for(int i=0; i<fp->q; i++){
+		fp->beta[i] = 0.0;
 		for(int j=0; j<ds->nFeatures; j++){
 			fp->beta[i] += rd->w[j]*ds->data[fp->inactive[i]][j];
 		}
-		fp->gradF[i] = 1 - fp->beta[i];
-		if(fp->inactive[i] >= ds->procPos){
-			fp->gradF[i] = 1 - fp->beta[i];
+		if(fp->inactive[i] < ds->procPos){
+			fp->gradF[fp->inactive[i]] = 1.0 - fp->beta[i];
 		}else{
-			fp->gradF[i] = 1 + fp->beta[i];
+			fp->gradF[fp->inactive[i]] = 1.0 + fp->beta[i];
 		}
-		fp->beta[i] += rd->ytr;
-		if(fp->inactive[i] >= ds->procPos){
-			fp->beta[i] = 1.05 - fp->beta[i];
+		if(fp->inactive[i] < ds->procPos){
+			fp->beta[i] = .05 + fp->beta[i] + rd->ytr;
 		}else{
-			fp->beta[i] = 1.05 + fp->beta[i];
+			fp->beta[i] = .05 - fp->beta[i] - rd->ytr;
 		}
 	}
 }
 
-void find_n_worst(int *temp, int n, struct Fullproblem *fp){
+int find_n_worst(int *temp, int n, struct Fullproblem *fp){
   double *betaVal = malloc(sizeof(double)*n);
   for (int i = 0; i < n; i++) {
     betaVal[i] = DBL_MAX;
@@ -204,7 +240,7 @@ void find_n_worst(int *temp, int n, struct Fullproblem *fp){
       n = i;
     }
   }
-
+  free(betaVal);
   return n;
 }
 

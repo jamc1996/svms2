@@ -13,7 +13,7 @@
 
 void run_Yserial_problem(struct yDenseData *ds, struct Fullproblem *fp, struct Projected *sp);
 void run_serial_problem(struct denseData *ds, struct Fullproblem *fp, struct Projected *sp);
-void find_n_worst(int *temp, int n, struct Fullproblem *fp);
+int find_n_worst(int *temp, int n, struct Fullproblem *fp);
 void rootCalcW(struct receiveData *rd, struct yDenseData *nds, struct Fullproblem *nfp);
 void calcW(struct receiveData *rd);
 void ReceiveCalcBeta(struct Fullproblem *fp, struct receiveData *rd, struct denseData *ds);

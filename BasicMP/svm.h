@@ -123,7 +123,7 @@ struct receiveData{
 	int nPos;
 	double ytr;
 	double *alpha;
-
+	int *y;
 	double *data1d;
 	double **data;
 

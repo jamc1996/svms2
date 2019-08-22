@@ -156,7 +156,7 @@ void YfindWorst(int *worst, int* target, int* change, int *n, struct yDenseData 
       (*change) = 1;
     }
   }
-  (*target) *= (*change)*ds->y[fp->active[(*n)]];
+  (*target) = (*change)*ds->y[fp->active[(*n)]];
 
 	for (int i = 0; i < fp->q; i++) {
 		if( (ds->y[fp->inactive[i]] == *target)){
