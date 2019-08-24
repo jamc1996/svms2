@@ -1,0 +1,4 @@
+	./gert -f kc1.csv -k kc1Model.txt
+	./gert -f kc1.csv -k kc1Model.txt
+	./gert -f kc1.csv -k kc1Model.txt
+
