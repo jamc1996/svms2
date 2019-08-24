@@ -103,12 +103,10 @@ int cg(struct Projected *sp, struct Fullproblem *fp)
 
     if(problem){
       if (problem >= sp->p*2) {
-        printf("Oh no! (%d) %d\n",sp->p,fp->active[problem - (sp->p*2)] );
         linearOp(sp->alphaHat, sp->rho, -lambda, sp->p);
         return problem;
       }
       else if( problem < -sp->p){
-        printf("Oh no! (%d) %d\n",sp->p,fp->active[problem + (sp->p*2)] );
         linearOp(sp->alphaHat, sp->rho, -lambda, sp->p);
         return problem;
       }

@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
 	MPI_Comm mini_comm;
 
   // We loop until no negative entries in beta:
-	run_serial_problem(&ds, &fp, &sp); 
+//	run_serial_problem(&ds, &fp, &sp); 
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	if(nProcGroups < nprocs){

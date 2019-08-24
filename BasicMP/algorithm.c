@@ -24,7 +24,6 @@ void run_Yserial_problem(struct yDenseData *ds, struct Fullproblem *fp, struct P
   while(k){
 	for(int i=0; i<ds->nInstances; i++){
 		if(fp->alpha[i] < -fp->C){
-			printf("here %d\n",itt);
 			for(int i=0; i<fp->n; i++){
 				printf("%lf\n",fp->alpha[i]);
 			}
@@ -59,7 +58,6 @@ void run_Yserial_problem(struct yDenseData *ds, struct Fullproblem *fp, struct P
 	}
 
    	if (n==0) {
-     	printf("Converged! (itt = %d) %d %d\n", itt, fp->p, fp->n );
 
      	int add = 2;
 	    int *temp = malloc(sizeof(int)*add);
@@ -80,7 +78,6 @@ void run_Yserial_problem(struct yDenseData *ds, struct Fullproblem *fp, struct P
 	    // BCs broken, fix one at a time for the moment
 	    k = Ysingleswap(ds, fp, sp, n, &parameters);
 	    if (k < 0) {
-		printf("shrinking\n");
 	      shrinkSize(fp, sp, k+fp->p);
 	    }
 	    else{
@@ -121,12 +118,9 @@ void run_serial_problem(struct denseData *ds, struct Fullproblem *fp, struct Pro
    	calculateBeta(fp, sp, ds);
 
    	if (n==0) {
-     	printf("Converged! (itt = %d) %d %d\n", itt, fp->p, fp->n );
-
      	int add = 2;
 	    int *temp = malloc(sizeof(int)*add);
 	    int *temp2 = malloc(sizeof(int)*add);
-		printf("finding add\n");
 	    add = findWorstest(fp,add,temp,temp2);
 
 	    if (add == 0){
@@ -135,13 +129,7 @@ void run_serial_problem(struct denseData *ds, struct Fullproblem *fp, struct Pro
 
 	    changeP(fp, sp, add);
 	    reinitprob(ds, fp, sp, add, temp, temp2);
-		for(int i=0;i<fp->p; i++){
-			printf("fp.active[%d] = %d\n",i,fp->active[i]);
-		}
-		for(int i=0;i<fp->q; i++){
-			printf("fp.inactive[%d] = %d\n",i,fp->inactive[i]);
-		}
-
+	
 	    free(temp);
 	    free(temp2);
 	  }

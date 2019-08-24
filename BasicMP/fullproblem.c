@@ -344,7 +344,6 @@ int Ysingleswap(struct yDenseData *ds, struct Fullproblem *fp, struct Projected 
   if (flag)
   {
  if ( (ds->y[fp->inactive[worst]] == target)){ 
-	printf("a diff %lf\n",diff);
       YadjustGradF(fp, ds, sp, n, worst, change, 1, flag, params, diff);
       fp->alpha[fp->inactive[worst]] += diff;
       fp->alpha[fp->active[n]] = sp->C;
@@ -353,7 +352,6 @@ int Ysingleswap(struct yDenseData *ds, struct Fullproblem *fp, struct Projected 
       fp->beta[worst] = DBL_MAX;
     }
     else{
-	printf("b\n");
       YadjustGradF(fp, ds, sp, n, worst, change, 0, flag, params, diff);
       fp->alpha[fp->inactive[worst]] -= diff;
       fp->alpha[fp->active[n]] = sp->C;
@@ -365,7 +363,6 @@ int Ysingleswap(struct yDenseData *ds, struct Fullproblem *fp, struct Projected 
   else
   {
  if ( ds->y[fp->inactive[worst]] == target){
-	printf("c\n");
       YadjustGradF(fp, ds, sp, n, worst, change, 1, flag, params, diff);
       fp->alpha[fp->inactive[worst]] += diff;
       fp->alpha[fp->active[n]] = 0.0;//sp->C ;
@@ -374,7 +371,6 @@ int Ysingleswap(struct yDenseData *ds, struct Fullproblem *fp, struct Projected 
       fp->beta[worst] = DBL_MAX-1.0;
     }
     else {
-	printf("d\n");
       YadjustGradF(fp, ds, sp, n, worst, change, 0, flag, params, diff);
       fp->alpha[fp->inactive[worst]] -= diff;
       fp->alpha[fp->active[n]] = 0.0;//sp->C ;
@@ -395,7 +391,6 @@ int singleswap(struct denseData *ds, struct Fullproblem *fp, struct Projected *s
   if (n>0) {
     flag = 1;
   }
-printf("n is %d\n",n);
   int worst = -1;
   int target, change=1;
 
@@ -428,7 +423,6 @@ printf("n is %d\n",n);
   if (flag)
   {
  if ( (fp->inactive[worst] < ds->procPos && target > 0) || (fp->inactive[worst] >= ds->procPos && target < 0) ) {
-	printf("a diff %lf\n",diff);
       adjustGradF(fp, ds, sp, n, worst, change, 1, flag, params, diff);
       fp->alpha[fp->inactive[worst]] += diff;
       fp->alpha[fp->active[n]] = sp->C;
@@ -437,7 +431,6 @@ printf("n is %d\n",n);
       fp->beta[worst] = DBL_MAX;
     }
     else{
-	printf("b\n");
       adjustGradF(fp, ds, sp, n, worst, change, 0, flag, params, diff);
       fp->alpha[fp->inactive[worst]] -= diff;
       fp->alpha[fp->active[n]] = sp->C;
@@ -449,7 +442,6 @@ printf("n is %d\n",n);
   else
   {
  if ( (fp->inactive[worst] < ds->procPos && target > 0) || (fp->inactive[worst] >= ds->procPos && target < 0) ) {
-	printf("c\n");
       adjustGradF(fp, ds, sp, n, worst, change, 1, flag, params, diff);
       fp->alpha[fp->inactive[worst]] += diff;
       fp->alpha[fp->active[n]] = 0.0;//sp->C ;
@@ -458,7 +450,6 @@ printf("n is %d\n",n);
       fp->beta[worst] = DBL_MAX-1.0;
     }
     else {
-	printf("d\n");
       adjustGradF(fp, ds, sp, n, worst, change, 0, flag, params, diff);
       fp->alpha[fp->inactive[worst]] -= diff;
       fp->alpha[fp->active[n]] = 0.0;//sp->C ;
@@ -727,7 +718,6 @@ void changeP( struct Fullproblem *fp, struct Projected *sp, int add)
   fp->p += add;
   fp->q -= add;
   sp->p += add;
-	printf("p is %d, q is %d\n",fp->p, fp->q);
 
   fp->active = realloc(fp->active,sizeof(int)*fp->p);
   fp->inactive = realloc(fp->inactive,sizeof(int)*fp->q);

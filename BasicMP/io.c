@@ -624,7 +624,6 @@ void cleanData( struct denseData *ds){
 void freeDenseData(struct denseData *ds)
 /* Function to free dynamically allocated memory in dense data set struct. */
 {
-	printf("free Dense data\n");
   free(ds->data);
   free(ds->data1d);
 }

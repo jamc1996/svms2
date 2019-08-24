@@ -186,7 +186,6 @@ void YappendUpdate(struct yDenseData *ds, double *line, int n)
 {
 	int j;
   if (parameters.kernel == LINEAR) {
-		printf("adding to line %d\n",n);
 		#pragma omp parallel for private(j)
     for (int i = 0; i < ds->nInstances; i++) {
       line[i] = 0.0;
@@ -227,8 +226,7 @@ void appendUpdate(struct denseData *ds, double *line, int n)
 {
 	int j;
   if (parameters.kernel == LINEAR) {
-		printf("adding to line %d\n",n);
-		#pragma omp parallel for private(j)
+    #pragma omp parallel for private(j)
     for (int i = 0; i < ds->procInstances; i++) {
       line[i] = 0.0;
       for ( j = 0; j < ds->nFeatures; j++) {
