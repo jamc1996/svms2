@@ -1,2 +1,0 @@
-	./gert -f kc1.csv -k kc1Model.txt
-

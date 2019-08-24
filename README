@@ -1,0 +1,13 @@
+This is the repository for gertSVM, my parallel implimentation of the svm training method using the conjugate gradient method as described by Wen, Edelman, and Gorsich (2001).
+
+The repositories are divided as follows:
+
+	Serial -- the serial implementation of the training method.
+
+	TwoSidedComm -- a simple parallel implementation using two sided communications.
+
+	OneSidedComm -- the same parallel implementation but with RMA.
+
+	Reduced -- an improved parallel implementation with training spread out better.
+
+	TreeReduction -- the final adaption to the code, using a tree reduction.
