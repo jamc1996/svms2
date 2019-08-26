@@ -35,7 +35,7 @@ linked.o: linked.c linked.h svm.h
 
 .PHONY: clean
 clean:
-	rm -f gert $(objects)
+	rm -f gert *Model.txt $(objects)
 
 test: testPHP testStates testBasketball testPoly
 

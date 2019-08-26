@@ -12,4 +12,5 @@
 #include <omp.h>
 #include <mpi.h>
 
-void tradeInfo(struct receiveData *rd, struct denseData *ds, struct yDenseData *nds, struct Fullproblem *fp, struct Fullproblem *newfp, MPI_Comm mini_comm, int commSz, int commID, int myid);
+void tradeInfo(struct receiveData *rd, struct denseData *ds, struct yDenseData *nds, struct Fullproblem *fp, struct Fullproblem *newfp, int nprocs, int myid, MPI_Comm comm);
+

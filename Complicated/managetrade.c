@@ -1,6 +1,6 @@
 #include "managetrade.h"
 
-void tradeInfo(struct receiveData *rd, struct denseData *ds, struct yDenseData *nds, struct Fullproblem *fp, struct Fullproblem *nfp, MPI_Comm mini_comm, int commSz, int commID, int myid)
+void tradeInfo(struct receiveData *rd, struct denseData *ds, struct yDenseData *nds, struct Fullproblem *fp, struct Fullproblem *nfp, int nprocs, int myid, MPI_Comm comm)
 {
 	int my_missed = 0;
 	int *my_missedInds;	
@@ -31,14 +31,14 @@ void tradeInfo(struct receiveData *rd, struct denseData *ds, struct yDenseData *
 	double* alp;
 	int tMissed = my_missed;
 	int tP = my_p;
-	MPI_Barrier(mini_comm);
-	MPI_Allreduce( &(my_missed), &tMissed, 1, MPI_INT, MPI_SUM, mini_comm);
-	MPI_Allreduce( &(my_p), &tP, 1, MPI_INT, MPI_SUM, mini_comm);
+	MPI_Barrier(comm);
+	MPI_Allreduce( &(my_missed), &tMissed, 1, MPI_INT, MPI_SUM, comm);
+	MPI_Allreduce( &(my_p), &tP, 1, MPI_INT, MPI_SUM, comm);
 	rd->total = tMissed+tP;
 
-	int *otherP = malloc(sizeof(int)*commSz);
-	otherP[commID] = fp->p + my_missed;
-	if(commID == 0){
+	int *otherP = malloc(sizeof(int)*nprocs);
+	otherP[myid] = fp->p + my_missed;
+	if(myid == 0){
 		if(tMissed ==0){
 			nfp->inactive = NULL;
 			nfp->beta = NULL;
@@ -84,21 +84,18 @@ void tradeInfo(struct receiveData *rd, struct denseData *ds, struct yDenseData *
 	}
 
 
-for(int i=0; i<nfp->n; i++){
-
-}
-	int q = otherP[commID];
-	for(int i = 1; i<commSz; i++){
-		if(i == commID){
-			MPI_Send(&otherP[i], 1, MPI_INT, 0, i, mini_comm);
-			MPI_Send(alp, otherP[i], MPI_DOUBLE, 0, i, mini_comm);
-		}else if(commID == 0){
-			MPI_Recv(&otherP[i] , 1 , MPI_INT, i, i, mini_comm, MPI_STATUS_IGNORE);
-			MPI_Recv(&(nfp->gradF[q]) , otherP[i], MPI_DOUBLE, i, i, mini_comm, MPI_STATUS_IGNORE);
+	int q = otherP[myid];
+	for(int i = 1; i<nprocs; i++){
+		if(i == myid){
+			MPI_Send(&otherP[i], 1, MPI_INT, 0, i, comm);
+			MPI_Send(alp, otherP[i], MPI_DOUBLE, 0, i, comm);
+		}else if(myid == 0){
+			MPI_Recv(&otherP[i] , 1 , MPI_INT, i, i, comm, MPI_STATUS_IGNORE);
+			MPI_Recv(&(nfp->gradF[q]) , otherP[i], MPI_DOUBLE, i, i, comm, MPI_STATUS_IGNORE);
 			q+=otherP[i];
 		}
 	}
-	if(commID == 0){
+	if(myid == 0){
 
 		for(int i=0; i<fp->p; i++){
 			nfp->gradF[i] = -fp->alpha[fp->active[i]];
@@ -112,7 +109,7 @@ for(int i=0; i<nfp->n; i++){
 				nfp->gradF[fp->p + i] = -nfp->gradF[fp->p + i];
 			}
 		}
-int pos = 0;
+		int pos = 0;
 		for(int i = 0; i< nfp->n; i++){
 
 			if(nfp->gradF[i] > 0){
@@ -128,7 +125,7 @@ int pos = 0;
 		int tot = 0;
 
 		rd->nFeatures = ds->nFeatures;
-		for(int id = 0; id< commSz; id++){
+		for(int id = 0; id< nprocs; id++){
 			for(int j=0; j<otherP[id]; j++){
 				if(id == 0){
 					for(int k =0; k< ds->nFeatures; k++){
@@ -136,22 +133,22 @@ int pos = 0;
 					}
 					tot++;
 				}else{
-					MPI_Recv((nds->data[tot]), ds->nFeatures, MPI_DOUBLE, id, j, mini_comm, MPI_STATUS_IGNORE);
+					MPI_Recv((nds->data[tot]), ds->nFeatures, MPI_DOUBLE, id, j, comm, MPI_STATUS_IGNORE);
 					tot++;
 				}
 			}
 		}
 	}else{
 		for(int j=0; j<fp->p; j++){
-			MPI_Send(ds->data[fp->active[j]], ds->nFeatures, MPI_DOUBLE, 0, j, mini_comm );
+			MPI_Send(ds->data[fp->active[j]], ds->nFeatures, MPI_DOUBLE, 0, j, comm );
 		}
-		for(int j = fp->p ; j<otherP[commID] ; j++ ){
-			MPI_Send(ds->data[my_missedInds[j - fp->p]], ds->nFeatures, MPI_DOUBLE, 0, j, mini_comm);
+		for(int j = fp->p ; j<otherP[myid] ; j++ ){
+			MPI_Send(ds->data[my_missedInds[j - fp->p]], ds->nFeatures, MPI_DOUBLE, 0, j, comm);
 		}
 	}
-		MPI_Bcast(&(rd->nPos), 1, MPI_INT, 0,  mini_comm);
+		MPI_Bcast(&(rd->nPos), 1, MPI_INT, 0,  comm);
 
-	if(commID == 0){
+	if(myid == 0){
 		int act=0, inact = 0;
 		for(int i=0; i<nds->nInstances; i++){
 			if(fabs(nfp->alpha[i] - nfp->C)< 0.0005){
@@ -165,7 +162,7 @@ int pos = 0;
 		}
 	}
 
-	if(commID ==0){
+	if(myid ==0){
 		for(int i=0; i<nds->nInstances; i++){
 			nfp->gradF[i] = 1.0;
 		}

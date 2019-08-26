@@ -13,7 +13,7 @@
 #include <omp.h>
 #include <mpi.h>
 
-void run_parallel_algorithm( struct receiveData *rd, struct denseData *ds, struct Fullproblem *fp, struct yDenseData *nds, struct Fullproblem *nfp, struct Projected *nsp, MPI_Win dataWin, MPI_Win yWin, MPI_Win alphaWin, MPI_Win ytrWin, MPI_Win gradWin, int myid, int nprocs, MPI_Comm Comm, int sending );
+void run_parallel_algorithm( struct receiveData *rd, struct denseData *ds, struct Fullproblem *fp, struct yDenseData *nds, struct Fullproblem *nfp, struct Projected *nsp, int myid, int nprocs, MPI_Comm Comm, int sending );
 
 
 
@@ -60,7 +60,6 @@ int main(int argc, char *argv[]) {
   struct Fullproblem fp;
   struct Projected sp;
 	struct receiveData rd;
-	MPI_Win dataWin, alphaWin, ytrWin, gradWin, yWin;
 
 	int nprocs = 1, myid = 0;
 
@@ -90,7 +89,6 @@ int main(int argc, char *argv[]) {
   alloc_subprob(&sp, p);
 
 	int nProcGroups = nprocs;
-	int nStep = 0;
 	int colour = myid;
 	int groupID, groupSz;
 	MPI_Comm mini_comm;
@@ -112,7 +110,7 @@ int main(int argc, char *argv[]) {
 	struct yDenseData nds;
 	struct Projected nsp;
 
-	tradeInfo(&rd, &ds, &nds, &fp, &nfp, mini_comm, groupSz, groupID, myid);
+	tradeInfo(&rd, &ds, &nds, &fp, &nfp, nprocs, myid, MPI_COMM_WORLD);
 
 	if(myid == 0){
 	  alloc_subprob(&nsp, nfp.p);
@@ -120,82 +118,51 @@ int main(int argc, char *argv[]) {
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	if(myid == 0){
-		MPI_Win_create(nds.data1d, 15*nds.nInstances*nds.nFeatures*sizeof(double), sizeof(double), MPI_INFO_NULL, mini_comm, &dataWin);
-		MPI_Win_create(nfp.alpha, 15*nfp.n*sizeof(double), sizeof(double), MPI_INFO_NULL, mini_comm, &alphaWin);
-		MPI_Win_create(nfp.gradF, 15*nfp.n*sizeof(double), sizeof(double), MPI_INFO_NULL, mini_comm, &gradWin);
-		MPI_Win_create(nds.y, 15*nds.nInstances*sizeof(int), sizeof(int), MPI_INFO_NULL, mini_comm, &yWin);
-		MPI_Win_create(&(nsp.ytr), sizeof(double), sizeof(double), MPI_INFO_NULL, mini_comm, &ytrWin);
-	}else{
-		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &dataWin);
-		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &alphaWin);
-		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &gradWin);
-		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &yWin);
-		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &ytrWin);
-	}
-	
-
-	MPI_Win_fence(MPI_MODE_NOPRECEDE, dataWin);
-	MPI_Win_fence(MPI_MODE_NOPRECEDE, yWin);
-	MPI_Win_fence(MPI_MODE_NOPRECEDE, alphaWin);
-	MPI_Win_fence(MPI_MODE_NOPRECEDE, ytrWin);
-	MPI_Win_fence(MPI_MODE_NOPRECEDE, gradWin);
-
 	int sending = 5;	
-	run_parallel_algorithm( &rd, &ds, &fp, &nds, &nfp, &nsp, dataWin, yWin, alphaWin, ytrWin, gradWin, myid, nprocs, MPI_COMM_WORLD, sending );
+	run_parallel_algorithm( &rd, &ds, &fp, &nds, &nfp, &nsp, myid, nprocs, MPI_COMM_WORLD, sending );
 
 
 
 	freeDenseData(&ds);
 	freeFullproblem(&fp);
 	freeSubProblem(&sp);
-
-	MPI_Win_fence(MPI_MODE_NOSUCCEED, dataWin);
-	MPI_Win_fence(MPI_MODE_NOSUCCEED, alphaWin);
-	MPI_Win_fence(MPI_MODE_NOSUCCEED, ytrWin);
-	MPI_Win_fence(MPI_MODE_NOSUCCEED, gradWin);
-	MPI_Win_fence(MPI_MODE_NOSUCCEED, yWin);
-
-	MPI_Win_free(&yWin);
-	MPI_Win_free(&gradWin);
-	MPI_Win_free(&dataWin);
-	MPI_Win_free(&alphaWin);
-	MPI_Win_free(&ytrWin);
-
 	MPI_Finalize();
 
 	return 0;
 }
 
-void run_parallel_algorithm(struct receiveData *rd, struct denseData *ds, struct Fullproblem *fp, struct yDenseData *nds, struct Fullproblem *nfp, struct Projected *nsp, MPI_Win dataWin, MPI_Win yWin, MPI_Win alphaWin, MPI_Win ytrWin, MPI_Win gradWin, int myid, int nprocs, MPI_Comm Comm, int sending )
+void run_parallel_algorithm(struct receiveData *rd, struct denseData *ds, struct Fullproblem *fp, struct yDenseData *nds, struct Fullproblem *nfp, struct Projected *nsp, int myid, int nprocs, MPI_Comm Comm, int sending )
 {
 	int *temp = malloc(sizeof(int)*sending);
 	int *local_n = malloc(sizeof(int)*nprocs);
 	int itt = 0;
 	while ( 1 ) 
 	{
+		
 		itt++;
 		if(myid != 0)
 		{
-			MPI_Get(rd->data1d, rd->total*ds->nFeatures, MPI_DOUBLE, 0, 0 , rd->total*ds->nFeatures, MPI_DOUBLE, dataWin);
-			MPI_Get(rd->y, rd->total, MPI_INT, 0, 0, rd->total, MPI_INT, yWin);
+			MPI_Recv(rd->data1d, rd->total*ds->nFeatures, MPI_DOUBLE, 0, myid, Comm, MPI_STATUS_IGNORE);
+			MPI_Recv(rd->y, rd->total, MPI_INT, 0, myid, Comm, MPI_STATUS_IGNORE);
 		}
 		if(myid == 0){
+			for(int i=1; i<nprocs; i++){
+				MPI_Send(nds->data1d, nds->nInstances*nds->nFeatures, MPI_DOUBLE, i, i, Comm);
+				MPI_Send(nds->y, nds->nInstances, MPI_INT, i, i, Comm);
+			}
 			run_Yserial_problem(nds, nfp, nsp);
 		}
-		MPI_Win_fence(0, dataWin);
-		MPI_Win_fence(0, yWin);	
-		MPI_Win_fence(0, alphaWin);
-		MPI_Win_fence(0, ytrWin);
 
 		if(myid !=0 ){
-			MPI_Get(rd->alpha, rd->total, MPI_DOUBLE, 0, 0 ,rd->total, MPI_DOUBLE, alphaWin);
-			MPI_Get(&(rd->ytr), 1, MPI_DOUBLE, 0, 0 ,1, MPI_DOUBLE, ytrWin);
+			MPI_Recv(rd->alpha, rd->total, MPI_DOUBLE, 0, myid, Comm, MPI_STATUS_IGNORE);
+			MPI_Recv(&(rd->ytr), 1, MPI_DOUBLE, 0, myid, Comm, MPI_STATUS_IGNORE);
+		}else{
+			for(int i=0; i< nprocs; i++){
+				MPI_Send(nfp->alpha, nfp->n, MPI_DOUBLE, i, i, Comm);
+				MPI_Send(&(nsp->ytr), 1, MPI_DOUBLE, i, i, Comm);
+			}
 		}
-		MPI_Win_fence(0, alphaWin);
-		MPI_Win_fence(0, ytrWin);
 	
-
 		if(myid == 1){
 			calcW(rd);
 		}else{
@@ -218,25 +185,44 @@ void run_parallel_algorithm(struct receiveData *rd, struct denseData *ds, struct
 		if(global_n == 0){
 			break;
 		}
-		MPI_Win_fence(0, yWin);
-		
-		for (int i=0; i < local_n[myid]; i++){
-			MPI_Put(ds->data[temp[i]], ds->nFeatures, MPI_DOUBLE, 0, ds->nFeatures*(rd->total+local_start+i), ds->nFeatures, MPI_DOUBLE, dataWin);
-			MPI_Put(&fp->gradF[temp[i]], 1, MPI_DOUBLE, 0, rd->total+local_start+i, 1, MPI_DOUBLE, gradWin);
-			int y_send = -1;
-			if(temp[i] < ds->procPos){
-				y_send = 1;
+
+		if(myid != 0){		
+			for (int i=0; i < local_n[myid]; i++){
+				MPI_Send(ds->data[temp[i]], ds->nFeatures, MPI_DOUBLE, 0, myid, Comm);
+				MPI_Send(&(fp->gradF[temp[i]]), 1, MPI_DOUBLE, 0, myid, Comm);
+				int y_send = -1;
+				if(temp[i] < ds->procPos){
+					y_send = 1;
+				}
+				MPI_Send(&(y_send), 1, MPI_INT, 0, myid, Comm);
 			}
-			MPI_Put(&y_send, 1, MPI_INT, 0, rd->total+(local_start)+i, 1, MPI_INT, yWin);
+		}else{
+			for(int i=0; i< local_n[0]; i++){
+				for(int j=0; j<nds->nFeatures; j++){
+					nds->data[rd->total+i][j]=ds->data[temp[i]][j];
+				}
+				nfp->gradF[rd->total+i] = fp->gradF[temp[i]];
+				if(temp[i] < ds->procPos){
+					nds->y[rd->total+i] = 1;
+				}else{
+					nds->y[rd->total+i] = -1;
+				}
+			}
+			local_start+= local_n[0];
+			for (int i=1 ; i<nprocs; i++){
+				for (int j=0; j<local_n[i]; j++){
+					MPI_Recv(nds->data[rd->total+local_start+j], ds->nFeatures, MPI_DOUBLE, i, i, Comm, MPI_STATUS_IGNORE);
+					MPI_Recv(&(nfp->gradF[rd->total+local_start+j]), 1, MPI_DOUBLE, i, i, Comm, MPI_STATUS_IGNORE);
+					MPI_Recv(&(nds->y[rd->total+local_start+j]), 1, MPI_DOUBLE, i, i, Comm, MPI_STATUS_IGNORE);
+			}
+				local_start+= local_n[i];
+			}
 		}
-	
+		MPI_Barrier(Comm);
 		if(myid == 0){
 			update_root_nfp(nds, nfp, nprocs,global_n);
 		}
 	
-		MPI_Win_fence(0, yWin);
-		MPI_Win_fence(0, gradWin);
-		MPI_Win_fence(0, dataWin);
 		rd->total += global_n;
 
 		if(myid == 0){
@@ -245,14 +231,6 @@ void run_parallel_algorithm(struct receiveData *rd, struct denseData *ds, struct
 
 	}
 
-/*	for(int i=0; i<ds->procInstances; i++){
-		double k = rd->ytr;
-		for(int j=0; j<ds->nFeatures; j++){
-			k+= ds->data[i][j]*rd->w[j];
-		}
-		printf("k = %lf\n", k);
-	}
-*/
 
 	free(temp);
 	free(local_n);

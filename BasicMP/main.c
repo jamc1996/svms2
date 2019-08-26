@@ -60,7 +60,6 @@ int main(int argc, char *argv[]) {
   struct Fullproblem fp;
   struct Projected sp;
 	struct receiveData rd;
-	MPI_Win dataWin, alphaWin, ytrWin, gradWin, yWin;
 
 	int nprocs = 1, myid = 0;
 
@@ -89,49 +88,35 @@ int main(int argc, char *argv[]) {
   // Subproblem allocated:
   alloc_subprob(&sp, p);
 
-	int nProcGroups = nprocs;
-	int nStep = 0;
-	int colour = myid;
-	int groupID, groupSz;
-	MPI_Comm mini_comm;
+	MPI_Win dataWin, alphaWin, ytrWin, gradWin, yWin;
 
   // We loop until no negative entries in beta:
 //	run_serial_problem(&ds, &fp, &sp); 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	if(nProcGroups < nprocs){
-		MPI_Comm_free(&mini_comm);
-	}
-	nProcGroups/=2;
-	colour/=2;
-	MPI_Comm_split(MPI_COMM_WORLD, colour, myid, &mini_comm);
-	MPI_Comm_rank(mini_comm, &groupID);
-	MPI_Comm_size(mini_comm, &groupSz);
 
  	struct Fullproblem nfp;
 	struct yDenseData nds;
 	struct Projected nsp;
-
-	tradeInfo(&rd, &ds, &nds, &fp, &nfp, mini_comm, groupSz, groupID, myid);
-
+	tradeInfo(&rd, &ds, &nds, &fp, &nfp, nprocs, myid, MPI_COMM_WORLD);
 	if(myid == 0){
 	  alloc_subprob(&nsp, nfp.p);
 	}
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	if(myid == 0){
-		MPI_Win_create(nds.data1d, 15*nds.nInstances*nds.nFeatures*sizeof(double), sizeof(double), MPI_INFO_NULL, mini_comm, &dataWin);
-		MPI_Win_create(nfp.alpha, 15*nfp.n*sizeof(double), sizeof(double), MPI_INFO_NULL, mini_comm, &alphaWin);
-		MPI_Win_create(nfp.gradF, 15*nfp.n*sizeof(double), sizeof(double), MPI_INFO_NULL, mini_comm, &gradWin);
-		MPI_Win_create(nds.y, 15*nds.nInstances*sizeof(int), sizeof(int), MPI_INFO_NULL, mini_comm, &yWin);
-		MPI_Win_create(&(nsp.ytr), sizeof(double), sizeof(double), MPI_INFO_NULL, mini_comm, &ytrWin);
+if(myid == 0){
+		MPI_Win_create(nds.data1d, 15*nds.nInstances*nds.nFeatures*sizeof(double), sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD, &dataWin);
+		MPI_Win_create(nfp.alpha, 15*nfp.n*sizeof(double), sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD, &alphaWin);
+		MPI_Win_create(nfp.gradF, 15*nfp.n*sizeof(double), sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD, &gradWin);
+		MPI_Win_create(nds.y, 15*nds.nInstances*sizeof(int), sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD, &yWin);
+		MPI_Win_create(&(nsp.ytr), sizeof(double), sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD, &ytrWin);
 	}else{
-		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &dataWin);
-		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &alphaWin);
-		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &gradWin);
-		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &yWin);
-		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, mini_comm, &ytrWin);
+		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, MPI_COMM_WORLD, &dataWin);
+		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, MPI_COMM_WORLD, &alphaWin);
+		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, MPI_COMM_WORLD, &gradWin);
+		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, MPI_COMM_WORLD, &yWin);
+		MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, MPI_COMM_WORLD, &ytrWin);
 	}
 	
 
@@ -160,7 +145,13 @@ int main(int argc, char *argv[]) {
 	MPI_Win_free(&gradWin);
 	MPI_Win_free(&dataWin);
 	MPI_Win_free(&alphaWin);
-	MPI_Win_free(&ytrWin);
+	MPI_Win_free(&ytrWin);	
+
+
+
+
+
+
 
 	MPI_Finalize();
 
